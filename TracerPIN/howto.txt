@@ -1,0 +1,60 @@
+# Installation notes tested on Debian Jessie
+
+Requirements:
+-------------
+
+# First install some essential packages before starting
+sudo apt-get install --no-install-recommends wget ca-certificates make g++ libstdc++-4.9-dev mongodb-dev libboost-system1.55-dev libboost-thread1.55-dev libboost-filesystem1.55-dev libboost-program-options1.55-dev libssl-dev
+sudo dpkg --add-architecture i386
+sudo apt-get update
+sudo apt-get install --no-install-recommends gcc-multilib g++-multilib libstdc++-4.9-dev:i386 libboost-system1.55-dev:i386 libboost-thread1.55-dev:i386 libboost-filesystem1.55-dev:i386 libboost-program-options1.55-dev:i386  libssl-dev:i386
+
+# In Debian mongodb-dev is not properly built for multiarch so in order to have mongodb support for i386 binaries, one needs to have also a local i386 library:
+wget http://http.us.debian.org/debian/pool/main/m/mongodb/mongodb-dev_2.4.10-5_i386.deb
+mkdir mongo_i386
+dpkg-deb --fsys-tarfile mongodb-dev_2.4.10-5_i386.deb | tar x --strip-components=3 -C mongo_i386 ./usr/lib/libmongoclient.a
+# Adjust TracerPIN Makefile (steps below) if needed to point to the mongo_i386 directory
+
+MongoDB:
+One can work with a remote MongoDB so those dependencies are not stricty required but in most cases you probably want them:
+apt-get install --no-install-recommends mongodb mongodb-clients
+
+PIN Installation:
+-----------------
+# This tool requires Intel PIN tools to be installed.
+# E.g.: (we've to make sure the user has r/w access to PIN)
+wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.13-65163-gcc.4.4.7-linux.tar.gz
+tar xzf pin-2.13-65163-gcc.4.4.7-linux.tar.gz
+sudo mv pin-2.13-65163-gcc.4.4.7-linux /opt
+export PIN_ROOT=/opt/pin-2.13-65163-gcc.4.4.7-linux
+echo -e "\nexport PIN_ROOT=/opt/pin-2.13-65163-gcc.4.4.7-linux" >> ~/.bashrc
+
+Compilation of TracePIN:
+-----------------------
+make
+sudo cp -a Tracer /usr/local/bin
+sudo cp -a obj-* /usr/local/bin
+
+Usage:
+------
+Tracer
+Tracer /bin/ls
+=> trace-full-info.txt
+Tracer -t mongo -- /bin/ls
+# now one can observe trace with e.g. TraceGraph:
+tracegraph &
+# To remove the trace from mongodb:
+mongo
+> show databases
+> use trace_xxxxx
+> db.dropDatabase()
+> exit
+
+Credits:
+--------
+Based on code written by
+* Arnaud Maillet for his NSC2013 challenge writeup (http://kutioo.blogspot.be/2013/05/nosuchcon-2013-challenge-write-up-and.html)
+* tracesurfer for SSTIC2010 (https://code.google.com/p/tartetatintools/)
+* Carlos G. Prado for his Brucon workshop (http://brundlelab.wordpress.com/2013/09/30/brucon-2013-workshop-slides/)
+* source/tools/SimpleExamples/trace.cpp by Intel
+

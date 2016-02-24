@@ -1,0 +1,26 @@
+#!/bin/bash
+
+# Usage:
+# without args -> returns help
+# with command -> instrument command
+# with pin options -> you've to use usual PIN way: -pinoptions ... -- command
+
+options="--"
+path=$(dirname $0)
+# Disabling ASLR with setarch
+pin="setarch x86_64 -R $PIN_ROOT/pin"
+
+if [ "$1" = "" ]; then
+    $pin -ifeellucky -t $path/obj-intel64/Tracer.so -help -- /bin/ls
+    exit 1
+fi
+
+if [[ "$1" =~ ^- ]]; then
+    options=""
+fi
+if [ -e "$path/obj-ia32/Tracer.so" ]; then
+    modules="-ifeellucky -t64 $path/obj-intel64/Tracer.so -t $path/obj-ia32/Tracer.so"
+else
+    modules="-ifeellucky -t $path/obj-intel64/Tracer.so"
+fi
+$pin $modules $options $*
