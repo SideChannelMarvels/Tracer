@@ -1,0 +1,154 @@
+# Installation notes tested on Debian Jessie
+
+Installing TracerGrind
+----------------------
+# First install some essential packages before starting
+sudo apt-get install build-essential automake libcapstone-dev
+# You probably also want to have MongoDB for the traces
+sudo apt-get install mongodb mongodb-clients
+
+# Create the folder we are going to work in
+mkdir WB-Tools
+cd WB-Tools
+
+# Download Valgrind 3.10.1:
+wget http://www.valgrind.org/downloads/valgrind-3.10.1.tar.bz2
+
+# Mongo c drivers aren't in Debian so we're installing them from sources
+# mongotrace is using the version 1.0.2, newer versions are untested.
+# Skip this step if you already installed this for one of our other programs
+wget https://github.com/mongodb/mongo-c-driver/releases/download/1.0.2/mongo-c-driver-1.0.2.tar.gz
+tar xzf mongo-c-driver-1.0.2.tar.gz
+cd mongo-c-driver-1.0.2
+./configure
+make
+sudo make install
+cd ..
+# If needed, refresh dynamic linker cache to discover the new shared libraries:
+sudo ldconfig
+# Check:
+sudo ldconfig -p|grep libmongoc
+# If libraries are not found, this means /usr/local/lib is not in your linker path
+
+If you preferred to install mongo C drivers in /usr/lib, adjust path in TracerGraph sources
+See CPPFLAGS in mongotrace/Makefile
+
+# Copy TracerGrind to the current folder
+# Maybe use git co command here in the future?
+cp <source> .
+cd TracerGrind
+
+# Compile texttrace
+cd texttrace
+make
+sudo make install
+cd ..
+
+# Compile mongotrace 
+cd mongotrace
+make
+sudo make install
+cd ..
+
+# Compile the adapted Valgrind version
+tar xjf ../valgrind-3.10.1.tar.bz2
+cd valgrind-3.10.1
+cp -a ../tracergrind .
+patch -p1 <../valgrind-3.10.1.diff
+
+If you're running a Linux kernel >= 4.0, you need to patch configure.ac:
+--- configure.ac
++++ configure.ac
+@@ -303,7 +303,7 @@
+         kernel=`uname -r`
+
+         case "${kernel}" in
+-             2.6.*|3.*)
++             2.6.*|3.*|4.*)
+                    AC_MSG_RESULT([2.6.x/3.x family (${kernel})])
+                    AC_DEFINE([KERNEL_2_6], 1, [Define to 1 if you're using Linux 2.6.x or Linux 3.x])
+                    ;;
+
+If you've a glibc v2.21, patch configure.ac:
+--- configure.ac
++++ configure.ac
+@@ -1018,6 +1018,13 @@
+        DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
+        DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
+        ;;
++     2.21)
++       AC_MSG_RESULT(2.21 family)
++       AC_DEFINE([GLIBC_2_21], 1, [Define to 1 if you're using glibc 2.21.x])
++       DEFAULT_SUPP="glibc-2.X.supp ${DEFAULT_SUPP}"
++       DEFAULT_SUPP="glibc-2.34567-NPTL-helgrind.supp ${DEFAULT_SUPP}"
++       DEFAULT_SUPP="glibc-2.X-drd.supp ${DEFAULT_SUPP}"
++       ;;
+      darwin)
+        AC_MSG_RESULT(Darwin)
+        AC_DEFINE([DARWIN_LIBC], 1, [Define to 1 if you're using Darwin])
+
+./autogen.sh
+./configure
+make
+sudo make install
+
+Use TracerGrind
+---------------
+# In case /usr/local/lib is not in your linker path (cf above):
+LD_LIBRARY_PATH=$LD_LIBRARY_PATH:/usr/local/lib
+export LD_LIBRARY_PATH
+
+objdump -p /bin/ls |less
+# => executable image virtual address starts at 0x400000, so:
+valgrind --tool=tracergrind --filter=0x400000-0x500000 --output=foo.trace /bin/ls
+texttrace foo.trace foo.txt
+# Observe foo.txt
+mongotrace foo.trace mongodb://localhost
+# now one can observe trace with e.g. TraceGraph:
+tracegraph &
+# To remove the trace from mongodb:
+mongo
+> show databases
+> use trace_xxxxx
+> db.dropDatabase()
+> exit
+
+Usage with Wine:
+----------------
+Run another exe in wine first to keep wineserver up & running
+wine notepad.exe &
+Then e.g.:
+valgrind --quiet --trace-children=yes --tool=tracergrind --filter=0x400000-0x401000 --vex-iropt-register-updates=allregs-at-mem-access --output=foo.trace wine some_interesting.exe
+
+Usage with Android:
+-------------------
+cf valgrind-3.10.1/README.android
+see compilation notes above till before ./configure, then:
+
+export NDKROOT=/path/to/your/android-ndk-r9c
+export AR=$NDKROOT/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-ar
+export LD=$NDKROOT/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-ld
+export CC=$NDKROOT/toolchains/arm-linux-androideabi-4.8/prebuilt/linux-x86_64/bin/arm-linux-androideabi-gcc
+
+CPPFLAGS="--sysroot=$NDKROOT/platforms/android-3/arch-arm" \
+   CFLAGS="--sysroot=$NDKROOT/platforms/android-3/arch-arm" \
+   ./configure --prefix=/data/local/Inst \
+   --host=armv7-unknown-linux --target=armv7-unknown-linux \
+   --with-tmpdir=/sdcard
+make
+mkdir ../build
+make install DESTDIR=$(pwd)/../build
+=> That makes a ../build/data/local/Inst
+
+adb push ../build /
+
+=> installed in /data/local/Inst/
+
+/data/local/Inst/bin/valgrind --kernel-variant=android-gpu-adreno3xx --trace-children=yes --tool=tracergrind --filter=0x400000-0x401000 --vex-iropt-register-updates=allregs-at-mem-access --output=/sdcard/foo.trace mybin
+
+If Android 5.x
+=> https://bugs.kde.org/show_bug.cgi?id=331178
+workaround: --sigill-diagnostics=no
+
+/data/local/Inst/bin/valgrind --kernel-variant=android-gpu-adreno3xx --sigill-diagnostics=no --trace-children=yes --tool=tracergrind --filter=0x400000-0x401000 --vex-iropt-register-updates=allregs-at-mem-access --output=/sdcard/foo.trace mybin
+
