@@ -22,14 +22,11 @@
 #include "pin.H"
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <cstdlib>
 #include <iomanip>
 #include <map>
-#ifdef MONGOSUPPORT
-#include <mongo/bson/bson.h>
-#include <mongo/client/dbclient.h>
-#include <vector>
-#endif //MONGOSUPPORT
+#include <sqlite3.h>
 #include <sys/time.h>
 #ifndef GIT_DESC
 #define GIT_DESC "(unknown version)"
@@ -40,6 +37,8 @@ using namespace std;
 /* ===================================================================== */
 
 std::ofstream TraceFile;
+std::stringstream value;
+std::string strvalue;
 PIN_LOCK lock;
 struct moduledata_t
 {
@@ -54,7 +53,6 @@ modmap_t mod_data;
 ADDRINT main_begin;
 ADDRINT main_end;
 bool main_reached=false;
-INT32 picklecount=0;
 INT64 logfilter=1;
 bool logfilterlive=false;
 ADDRINT filter_begin=0;
@@ -69,34 +67,20 @@ long long currentbbl=0;
 enum InfoTypeType { T, C, B, R, I, W };
 InfoTypeType InfoType=T;
 std::string TraceName;
+sqlite3 *db;
+sqlite3_int64 bbl_id = 0, ins_id = 0;
+sqlite3_stmt *info_insert, *bbl_insert, *call_insert, *lib_insert, *ins_insert, *mem_insert, *thread_insert, *thread_update;
 
-#ifdef MONGOSUPPORT
-enum LogTypeType { HUMAN, PICKLE, MONGO };
-mongo::DBClientConnection mongo_c;
+enum LogTypeType { HUMAN, SQLITE };
+static const char *SETUP_QUERY = 
+"CREATE TABLE IF NOT EXISTS info (key TEXT PRIMARY KEY, value TEXT);\n"
+"CREATE TABLE IF NOT EXISTS lib (name TEXT, base TEXT, end TEXT);\n"
+"CREATE TABLE IF NOT EXISTS bbl (addr TEXT, addr_end TEXT, size INTEGER, thread_id INTEGER);\n"
+"CREATE TABLE IF NOT EXISTS call (ins_id INTEGER, addr TEXT, name TEXT);\n"
+"CREATE TABLE IF NOT EXISTS ins (bbl_id INTEGER, ip TEXT, dis TEXT, op TEXT);\n"
+"CREATE TABLE IF NOT EXISTS mem (ins_id INTEGER, ip TEXT, type TEXT, addr TEXT, addr_end TEXT, size INTEGER, data TEXT, value TEXT);\n"
+"CREATE TABLE IF NOT EXISTS thread (thread_id INTEGER, start_bbl_id INTEGER, exit_bbl_id INTEGER);\n";
 
-#define MONGO_BUFFER_SIZE 2048
-struct mongo_buffer {
-    string name;
-    size_t i;
-    std::vector< mongo::BSONObj > *v;
-};
-struct mongo_buffer mongo_buffer_call;
-struct mongo_buffer mongo_buffer_bbl;
-struct mongo_buffer mongo_buffer_read;
-struct mongo_buffer mongo_buffer_ins;
-struct mongo_buffer mongo_buffer_write;
-
-void MongoInsert(struct mongo_buffer *b)
-{
-    if(b->i != MONGO_BUFFER_SIZE)
-        // This should happen only at the end!
-        b->v->resize(b->i);
-    mongo_c.insert(TraceName+"."+b->name, *(b->v));
-    b->i=0;
-}
-#else //MONGOSUPPORT
-enum LogTypeType { HUMAN, PICKLE };
-#endif //MONGOSUPPORT
 LogTypeType LogType=HUMAN;
 
 /* ===================================================================== */
@@ -123,13 +107,8 @@ KNOB<INT> KnobLogFilterLiveN(KNOB_MODE_WRITEONCE, "pintool",
                            "n", "0", "which occurence to log, 0=all (only for -F start:stop filter)");
 KNOB<INT> KnobCacheIns(KNOB_MODE_WRITEONCE, "pintool",
                         "cache", "0", "(0) default cache size (n) Limit caching to n instructions per trace, useful for SMC (see also -smc_strict 1)");
-#ifdef MONGOSUPPORT
 KNOB<string> KnobLogType(KNOB_MODE_WRITEONCE, "pintool",
-                         "t", "human", "log type: human/pickle/mongo");
-#else //MONGOSUPPORT
-KNOB<string> KnobLogType(KNOB_MODE_WRITEONCE, "pintool",
-                         "t", "human", "log type: human/pickle");
-#endif //MONGOSUPPORT
+                         "t", "human", "log type: human/sqlite");
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -212,22 +191,13 @@ BOOL ExcludedAddressLive(ADDRINT ip)
 /* Helper Functions for Instruction_cb                                   */
 /* ===================================================================== */
 
-VOID pickleAddr(char t, ADDRINT p)
-{
-    TraceFile << "(S'" << t << "'" << endl;
-    TraceFile << "p" << ++picklecount << endl;
-    TraceFile << 'I' << dec << p << endl;
-    TraceFile << "tp" << ++picklecount << endl;
-    TraceFile << "a";
-}
-
 VOID printInst(ADDRINT ip, string *disass, INT32 size)
 {
-    UINT8 value[32];
+    UINT8 v[32];
     // test on logfilterlive here to avoid calls when not using live filtering
     if (logfilterlive && ExcludedAddressLive(ip))
         return;
-    if ((size_t)size > sizeof(value))
+    if ((size_t)size > sizeof(v))
     {
         cout << "[!] Instruction size > 32 at " << dec << bigcounter << hex << (void *)ip << " " << *disass << endl;
         return;
@@ -235,42 +205,40 @@ VOID printInst(ADDRINT ip, string *disass, INT32 size)
     PIN_GetLock(&lock, ip);
     if (InfoType >= I) bigcounter++;
     InfoType=I;
-    PIN_SafeCopy(value, (void *)ip, size);
+    PIN_SafeCopy(v, (void *)ip, size);
     switch (LogType) {
         case HUMAN:
             TraceFile << "[I]" << setw(10) << dec << bigcounter << hex << setw(16) << (void *)ip << "    " << setw(40) << left << *disass << right;
             TraceFile << setfill('0');
             for (INT32 i = 0; i < size; i++)
             {
-                TraceFile << " " << setfill('0') << setw(2) << static_cast<UINT32>(value[i]);
+                TraceFile << " " << setfill('0') << setw(2) << static_cast<UINT32>(v[i]);
             }
             TraceFile << setfill(' ');
             TraceFile << endl;
             break;
-        case PICKLE:
-            pickleAddr('I', (ADDRINT)ip);
-            break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            mongo::BSONObjBuilder b;
-            b.append("_id", bigcounter);
-            b.append("bbl_id", currentbbl);
-            std::stringstream fmt;
-            fmt << hex << "0x" << setfill('0') << setw(16) << ip;
-            b.append("ip", fmt.str());
-            b.append("dis", *disass);
-            std::stringstream fmt2;
-            fmt2 << setfill('0') << hex;
+        case SQLITE:
+            sqlite3_reset(ins_insert);
+            sqlite3_bind_int64(ins_insert, 1, bbl_id);
+            value.str("");
+            value.clear();
+            value << hex << "0x" << setfill('0') << setw(16) << ip;
+            strvalue = value.str();
+            sqlite3_bind_text(ins_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(ins_insert, 3, (*disass).c_str(), -1, SQLITE_TRANSIENT);
+            value.str("");
+            value.clear();
+            value << setfill('0') << hex;
             for (INT32 i = 0; i < size; i++)
             {
-                fmt2 << setw(2) << static_cast<UINT32>(value[i]);
+                value << setw(2) << static_cast<UINT32>(v[i]);
             }
-            b.append("op", fmt2.str());
-            mongo_buffer_ins.v->at(mongo_buffer_ins.i++)=b.obj();
-            if (mongo_buffer_ins.i == MONGO_BUFFER_SIZE)
-                MongoInsert(&mongo_buffer_ins);
+            strvalue = value.str();
+            sqlite3_bind_text(ins_insert, 4, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            if(sqlite3_step(ins_insert) != SQLITE_DONE)
+                printf("INS error: %s\n", sqlite3_errmsg(db));
+            ins_id = sqlite3_last_insert_rowid(db);
             break;
-#endif //MONGOSUPPORT
     }
 // To get context, see https://software.intel.com/sites/landingpage/pintool/docs/49306/Pin/html/group__CONTEXT__API.html
     PIN_ReleaseLock(&lock);
@@ -321,68 +289,71 @@ static VOID RecordMemHuman(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, INT
     }
     TraceFile << setfill(' ') << endl;
 }
-#ifdef MONGOSUPPORT
-static VOID RecordMemMongo(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, INT32 size, BOOL isPrefetch)
+
+static VOID RecordMemSqlite(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, INT32 size, BOOL isPrefetch)
 {
-    struct mongo_buffer *buffer = (r=='W') ? &mongo_buffer_write : &mongo_buffer_read;
-    mongo::BSONObjBuilder b;
-    b.append("_id", bigcounter);
-    b.append("bbl_id", currentbbl);
-    std::stringstream fmt;
-    fmt << hex << "0x" << setfill('0') << setw(16) << ip;
-    b.append("ip", fmt.str());
-    std::stringstream fmt2;
-    fmt2 << hex << "0x" << setfill('0') << setw(16) << addr;
-    b.append("addr", fmt2.str());
-    std::stringstream fmt2b;
-    fmt2b << hex << "0x" << setfill('0') << setw(16) << addr + size - 1;
-    b.append("addr_end", fmt2b.str());
-    b.append("size", size);
+    // Insert read or write
+    sqlite3_reset(mem_insert);
+    sqlite3_bind_int64(mem_insert, 1, ins_id);
+    value.str("");
+    value.clear();
+    value << hex << "0x" << setfill('0') << setw(16) << ip;
+    strvalue = value.str();
+    sqlite3_bind_text(mem_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+    char mode[2] = {0,0};
+    mode[0]=r;
+    sqlite3_bind_text(mem_insert, 3, mode, -1, SQLITE_TRANSIENT);
+    value.str("");
+    value.clear();
+    value << hex << "0x" << setfill('0') << setw(16) << addr;
+    strvalue = value.str();
+    sqlite3_bind_text(mem_insert, 4, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+    value.str("");
+    value.clear();
+    value << hex << "0x" << setfill('0') << setw(16) << addr;
+    strvalue = value.str();
+    sqlite3_bind_text(mem_insert, 5, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+    sqlite3_bind_int(mem_insert, 6, size);
     if (!isPrefetch)
     {
-        std::stringstream fmt3;
-        fmt3 << hex  << "0x" << setfill('0');
+        value.str("");
+        value.clear();
+        value << hex << setfill('0');
+        for (INT32 i = 0; i < size; i++)
+        {
+            value << setw(2) << static_cast<UINT32>(memdump[i]);
+        }
+        strvalue = value.str();
+        sqlite3_bind_text(mem_insert, 7, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+        value.str("");
+        value.clear();
+        value << hex  << "0x" << setfill('0');
         switch(size)
         {
         case 0:
             break;
-
         case 1:
-            fmt3 << setw(2) << static_cast<UINT32>(*memdump);
-            b.append("value", fmt3.str());
+            value << setw(2) << static_cast<UINT32>(*memdump);
             break;
-
         case 2:
-            fmt3 << setw(4) << *(UINT16*)memdump;
-            b.append("value", fmt3.str());
+            value << setw(4) << *(UINT16*)memdump;
             break;
-
         case 4:
-            fmt3 << setw(8) << *(UINT32*)memdump;
-            b.append("value", fmt3.str());
+            value << setw(8) << *(UINT32*)memdump;
             break;
-
         case 8:
-            fmt3 << setw(16) << *(UINT64*)memdump;
-            b.append("value", fmt3.str());
+            value << setw(16) << *(UINT64*)memdump;
             break;
-
         default:
             break;
         }
-        std::stringstream fmt4;
-        fmt4 << hex << setfill('0');
-        for (INT32 i = 0; i < size; i++)
-        {
-            fmt4 << setw(2) << static_cast<UINT32>(memdump[i]);
-        }
-        b.append("data", fmt4.str());
+        strvalue = value.str();
+        sqlite3_bind_text(mem_insert, 8, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+        if(sqlite3_step(mem_insert) != SQLITE_DONE)
+            printf("MEM error: %s\n", sqlite3_errmsg(db));
     }
-    buffer->v->at(buffer->i++)=b.obj();
-    if (buffer->i == MONGO_BUFFER_SIZE)
-        MongoInsert(buffer);
 }
-#endif //MONGOSUPPORT
+
 static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefetch)
 {
     UINT8 memdump[256];
@@ -410,14 +381,9 @@ static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefe
         case HUMAN:
             RecordMemHuman(ip, r, addr, memdump, size, isPrefetch);
             break;
-        case PICKLE:
-            pickleAddr(r, (ADDRINT)addr);
+        case SQLITE:
+            RecordMemSqlite(ip, r, addr, memdump, size, isPrefetch);
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            RecordMemMongo(ip, r, addr, memdump, size, isPrefetch);
-            break;
-#endif //MONGOSUPPORT
     }
     PIN_ReleaseLock(&lock);
 }
@@ -533,22 +499,22 @@ void ImageLoad_cb(IMG Img, void *v)
                     TraceFile << "[!] Filter all addresses out of that range" << endl;
                 }
                 break;
-            case PICKLE:
+            case SQLITE:
+                sqlite3_reset(lib_insert);
+                sqlite3_bind_text(lib_insert, 1, imageName.c_str(), -1, SQLITE_TRANSIENT);
+                value.str("");
+                value.clear();
+                value << hex << "0x" << setfill('0') << setw(16) << lowAddress;
+                strvalue = value.str();
+                sqlite3_bind_text(lib_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+                value.str("");
+                value.clear();
+                value << hex << "0x" << setfill('0') << setw(16) << highAddress;
+                strvalue = value.str();
+                sqlite3_bind_text(lib_insert, 3, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+                if(sqlite3_step(lib_insert) != SQLITE_DONE)
+                    printf("LIB error: %s\n", sqlite3_errmsg(db));
                 break;
-#ifdef MONGOSUPPORT
-            case MONGO:
-                mongo::BSONObjBuilder b;
-                b.append("name", imageName);
-                std::stringstream fmtl;
-                fmtl << "0x" << hex << setfill('0') << setw(16) << lowAddress;
-                b.append("base", fmtl.str());
-                std::stringstream fmth;
-                fmth << "0x" << hex << setfill('0') << setw(16) << highAddress;
-                b.append("end", fmth.str());
-                mongo::BSONObj o = b.obj();
-                mongo_c.insert(TraceName+".main", o);
-                break;
-#endif //MONGOSUPPORT
         }
         main_begin = lowAddress;
         main_end = highAddress;
@@ -572,23 +538,22 @@ void ImageLoad_cb(IMG Img, void *v)
                 TraceFile << "[-] Module base: 0x" << hex << lowAddress  << endl;
                 TraceFile << "[-] Module end:  0x" << hex << highAddress << endl;
                 break;
-            case PICKLE:
+            case SQLITE:
+                sqlite3_reset(lib_insert);
+                sqlite3_bind_text(lib_insert, 1, imageName.c_str(), -1, SQLITE_TRANSIENT);
+                value.str("");
+                value.clear();
+                value << hex << "0x" << setfill('0') << setw(16) << lowAddress;
+                strvalue = value.str();
+                sqlite3_bind_text(lib_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+                value.str("");
+                value.clear();
+                value << hex << "0x" << setfill('0') << setw(16) << highAddress;
+                strvalue = value.str();
+                sqlite3_bind_text(lib_insert, 3, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+                if(sqlite3_step(lib_insert) != SQLITE_DONE)
+                    printf("LIB error: %s\n", sqlite3_errmsg(db));
                 break;
-#ifdef MONGOSUPPORT
-            case MONGO:
-                mongo::BSONObjBuilder b;
-                b.genOID();
-                b.append("name", imageName);
-                std::stringstream fmtl;
-                fmtl << "0x" << setfill('0') << setw(16) << hex << lowAddress;
-                b.append("base", fmtl.str());
-                std::stringstream fmth;
-                fmth << "0x" << setfill('0') << setw(16) << hex << highAddress;
-                b.append("end", fmth.str());
-                mongo::BSONObj o = b.obj();
-                mongo_c.insert(TraceName+".lib", o);
-                break;
-#endif //MONGOSUPPORT
         }
     }
     PIN_ReleaseLock(&lock);
@@ -610,28 +575,24 @@ void LogBasicBlock(ADDRINT addr, UINT32 size)
             TraceFile << " // size=" << dec << size;
             TraceFile << " thread=" << "0x" << hex << PIN_ThreadUid() << endl;
             break;
-        case PICKLE:
-            pickleAddr('B', addr);
+        case SQLITE:
+            sqlite3_reset(bbl_insert);
+            value.str("");
+            value.clear();
+            value << "0x" << hex << setfill('0') << setw(16) << addr;
+            strvalue = value.str();
+            sqlite3_bind_text(bbl_insert, 1, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            value.str("");
+            value.clear();
+            value << hex << "0x" << setfill('0') << setw(16) << addr + size - 1;
+            strvalue = value.str();
+            sqlite3_bind_text(bbl_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_int(bbl_insert, 3, size);
+            sqlite3_bind_int64(bbl_insert, 4, PIN_ThreadUid());
+            if(sqlite3_step(bbl_insert) != SQLITE_DONE)
+                printf("BBL error: %s\n", sqlite3_errmsg(db));
+            bbl_id = sqlite3_last_insert_rowid(db);
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            mongo::BSONObjBuilder b;
-            b.append("_id", bigcounter);
-            std::stringstream fmt;
-            fmt << "0x" << hex << setfill('0') << setw(16) << addr;
-            b.append("addr", fmt.str());
-            std::stringstream fmtb;
-            fmtb << hex << "0x" << setfill('0') << setw(16) << addr + size - 1;
-            b.append("addr_end", fmtb.str());
-            b.append("size", size);
-            std::stringstream fmt2;
-            fmt2 << "0x" << hex << setfill('0') << setw(16) << PIN_ThreadUid();
-            b.append("thread_id", fmt2.str());
-            mongo_buffer_bbl.v->at(mongo_buffer_bbl.i++)=b.obj();
-            if (mongo_buffer_bbl.i == MONGO_BUFFER_SIZE)
-                MongoInsert(&mongo_buffer_bbl);
-            break;
-#endif //MONGOSUPPORT
     }
     PIN_ReleaseLock(&lock);
 }
@@ -675,23 +636,16 @@ void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
                 TraceFile << "[!] Function 0x" << ip << " is filtered, no tracing" << endl;
             }
             break;
-        case PICKLE:
-            pickleAddr('C', ip);
+        case SQLITE:
+            value.str("");
+            value.clear();
+            value << "0x" << hex << setfill('0') << setw(16) << ip;
+            strvalue = value.str();
+            sqlite3_bind_text(call_insert, 1, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            sqlite3_bind_text(call_insert, 2, nameFunc.c_str(), -1, SQLITE_TRANSIENT);
+            if(sqlite3_step(call_insert) != SQLITE_DONE)
+                printf("CALL error: %s\n", sqlite3_errmsg(db));
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            mongo::BSONObjBuilder b;
-            b.append("_id", bigcounter);
-            std::stringstream fmt;
-            fmt << "0x" << hex << setfill('0') << setw(16) << ip;
-            b.append("addr", fmt.str());
-            b.append("name", nameFunc);
-//TODO ARGS
-            mongo_buffer_call.v->at(mongo_buffer_call.i++)=b.obj();
-            if (mongo_buffer_call.i == MONGO_BUFFER_SIZE)
-                MongoInsert(&mongo_buffer_call);
-            break;
-#endif //MONGOSUPPORT
     }
     PIN_ReleaseLock(&lock);
 }
@@ -810,23 +764,13 @@ void ThreadStart_cb(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v)
         case HUMAN:
             TraceFile << "[T]" << setw(10) << dec << bigcounter << hex << " Thread 0x" << PIN_ThreadUid() << " started. Flags: 0x" << hex << flags << endl;
             break;
-        case PICKLE:
-            pickleAddr('T', (ADDRINT) threadIndex);
+        case SQLITE:
+            sqlite3_reset(thread_insert);
+            sqlite3_bind_int64(thread_insert, 1, PIN_ThreadUid());
+            sqlite3_bind_int64(thread_insert, 2, currentbbl);
+            if(sqlite3_step(thread_insert) != SQLITE_DONE)
+                printf("THREAD error: %s\n", sqlite3_errmsg(db));
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            mongo::BSONObjBuilder b;
-            b.append("_id", bigcounter);
-            std::stringstream fmt;
-            fmt << "0x" << hex << setfill('0') << setw(16) << PIN_ThreadUid();
-            b.append("thread_id", fmt.str());
-            std::stringstream fmt2;
-            fmt2 << "0x" << hex << setfill('0') << setw(8) << flags;
-            b.append("entry_flags", fmt2.str());
-            mongo::BSONObj o = b.obj();
-            mongo_c.insert(TraceName+".thread", o);
-            break;
-#endif //MONGOSUPPORT
     }
     PIN_ReleaseLock(&lock);
 }
@@ -839,20 +783,13 @@ void ThreadFinish_cb(THREADID threadIndex, const CONTEXT *ctxt, INT32 code, VOID
         case HUMAN:
             TraceFile << "[T]" << setw(10) << dec << bigcounter << hex << " Thread 0x" << PIN_ThreadUid() << " finished. Code: " << dec << code << endl;
             break;
-        case PICKLE:
-            pickleAddr('t', (ADDRINT) threadIndex);
+        case SQLITE:
+            sqlite3_reset(thread_update);
+            sqlite3_bind_int64(thread_update, 1, currentbbl);
+            sqlite3_bind_int64(thread_update, 2, PIN_ThreadUid());
+            if(sqlite3_step(thread_update) != SQLITE_DONE)
+                printf("THREAD error: %s\n", sqlite3_errmsg(db));
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            mongo::BSONObjBuilder b;
-            std::stringstream fmt;
-            fmt << "0x" << hex << setfill('0') << setw(16) << PIN_ThreadUid();
-            b.append("thread_id", fmt.str());
-            mongo::BSONObj q = b.obj();
-            mongo::BSONObj o = BSON("$set" << BSON("exit_id" << bigcounter << "exit_code" << code));
-            mongo_c.update(TraceName+".thread", q, o);
-            break;
-#endif //MONGOSUPPORT
     }
     PIN_ReleaseLock(&lock);
 }
@@ -867,19 +804,20 @@ VOID Fini(INT32 code, VOID *v)
         case HUMAN:
             TraceFile.close();
             break;
-        case PICKLE:
-            TraceFile << "." << endl;
-            TraceFile.close();
+        case SQLITE:
+            sqlite3_exec(db, "COMMIT;", NULL, NULL, NULL);
+            sqlite3_finalize(info_insert);
+            sqlite3_finalize(lib_insert);
+            sqlite3_finalize(bbl_insert);
+            sqlite3_finalize(ins_insert);
+            sqlite3_finalize(mem_insert);
+            sqlite3_finalize(thread_insert);
+            sqlite3_finalize(thread_update);
+            if(sqlite3_close(db) != SQLITE_OK)
+            {
+                cout << "Failed to close db (wut?): " << sqlite3_errmsg(db) << endl;
+            }
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            MongoInsert(&mongo_buffer_call);
-            MongoInsert(&mongo_buffer_bbl);
-            MongoInsert(&mongo_buffer_read);
-            MongoInsert(&mongo_buffer_ins);
-            MongoInsert(&mongo_buffer_write);
-            break;
-#endif //MONGOSUPPORT
     }
 }
 
@@ -973,32 +911,14 @@ int  main(int argc, char *argv[])
     {
         LogType = HUMAN;
     }
-    else if (KnobLogType.Value().compare("pickle") == 0)
+    else if (KnobLogType.Value().compare("sqlite") == 0)
     {
-        LogType = PICKLE;
+        LogType = SQLITE;
         if (TraceName.compare("trace-full-info.txt") == 0)
-        {
-            TraceName = "trace.pickle";
-        }
+            TraceName = "trace-full-info.sqlite";
     }
-#ifdef MONGOSUPPORT
-    else if (KnobLogType.Value().compare("mongo") == 0)
-    {
-        LogType = MONGO;
-        if (TraceName.compare("trace-full-info.txt") == 0)
-        {
-            TraceName = "trace_";
-            struct timeval tv;
-            gettimeofday(&tv, NULL);
-            std::stringstream s;
-            s << tv.tv_sec;
-            TraceName+=s.str();
-        }
-    }
-#endif //MONGOSUPPORT
     switch (LogType) {
         case HUMAN:
-        case PICKLE:
             TraceFile.open(TraceName.c_str());
             if(TraceFile == NULL)
             {
@@ -1008,16 +928,31 @@ int  main(int argc, char *argv[])
                 cout << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
             }
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            try {
-                mongo_c.connect("localhost");
-                cout << "[*] Connected to MongoDB... will use db " << TraceName << endl;
-            } catch( mongo::DBException &e ) {
-                cout << "[!] Caught " << e.what() << endl;
+        case SQLITE:
+            remove(TraceName.c_str());
+            if(sqlite3_open(TraceName.c_str(), &db) != SQLITE_OK)
+            {
+                cout << "Could not open database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
+                return -1;
             }
+            if(sqlite3_exec(db, SETUP_QUERY, NULL, NULL, NULL) != SQLITE_OK)
+            {
+                cout << "Could not setup database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
+                return -1;
+            }
+            cout << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+            sqlite3_prepare_v2(db, "INSERT INTO info (key, value) VALUES (?, ?);", -1, &info_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO lib (name, base, end) VALUES (?, ?, ?);", -1, &lib_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO bbl (addr, addr_end, size, thread_id) VALUES (?, ?, ?, ?);", -1, &bbl_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO call (addr, name) VALUES (?, ?);", -1, &call_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO ins (bbl_id, ip, dis, op) VALUES (?, ?, ?, ?);", -1, &ins_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO mem (ins_id, ip, type, addr, addr_end, size, data, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?);", -1, &mem_insert, NULL);
+            sqlite3_prepare_v2(db, "INSERT INTO thread (thread_id, start_bbl_id) VALUES (?, ?);", -1, &thread_insert, NULL);
+            sqlite3_prepare_v2(db, "UPDATE thread SET exit_bbl_id=? WHERE thread_id=?;", -1, &thread_update, NULL);
+
+            sqlite3_exec(db, "BEGIN;", NULL, NULL, NULL);
+
             break;
-#endif //MONGOSUPPORT
     }
 
     switch (LogType) {
@@ -1030,38 +965,53 @@ int  main(int argc, char *argv[])
                 TraceFile << "[*]" << setw(5) << nArg << ": " << argv[nArg] << endl;
             TraceFile.unsetf(ios::showbase);
             break;
-        case PICKLE:
-            TraceFile << "(lp0" << endl;
-            TraceFile.unsetf(ios::showbase);
+        case SQLITE:
+            sqlite3_reset(info_insert);
+            sqlite3_bind_text(info_insert, 1, "TRACERPIN_VERSION", -1, SQLITE_TRANSIENT);
+            value.str("");
+            value.clear();
+            value << GIT_DESC << " / PIN " << PIN_PRODUCT_VERSION_MAJOR << "." << PIN_PRODUCT_VERSION_MINOR << " build " << PIN_BUILD_NUMBER;
+            strvalue = value.str();
+            sqlite3_bind_text(info_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            if(sqlite3_step(info_insert) != SQLITE_DONE)
+                printf("INFO error: %s\n", sqlite3_errmsg(db));
+
+            sqlite3_reset(info_insert);
+            sqlite3_bind_text(info_insert, 1, "PINPROGRAM", -1, SQLITE_TRANSIENT);
+            value.str("");
+            value.clear();
+            int nArg=0;
+            for (; (nArg < argc) && std::string(argv[nArg]) != "--"; nArg++) {
+                if (nArg>0) value << " ";
+                value << argv[nArg];
+            }
+            strvalue = value.str();
+            sqlite3_bind_text(info_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            if(sqlite3_step(info_insert) != SQLITE_DONE)
+                printf("INFO error: %s\n", sqlite3_errmsg(db));
+
+            if (++nArg < argc) {
+                sqlite3_reset(info_insert);
+                sqlite3_bind_text(info_insert, 1, "PROGRAM", -1, SQLITE_TRANSIENT);
+                sqlite3_bind_text(info_insert, 2, argv[nArg++], -1, SQLITE_TRANSIENT);
+                if(sqlite3_step(info_insert) != SQLITE_DONE)
+                    printf("INFO error: %s\n", sqlite3_errmsg(db));
+            }
+
+            sqlite3_reset(info_insert);
+            sqlite3_bind_text(info_insert, 1, "ARGS", -1, SQLITE_TRANSIENT);
+            value.str("");
+            value.clear();
+            int nArg_start=nArg;
+            for (; (nArg < argc); nArg++) {
+                if (nArg>nArg_start) value << " ";
+                value << argv[nArg];
+            }
+            strvalue = value.str();
+            sqlite3_bind_text(info_insert, 2, strvalue.c_str(), -1, SQLITE_TRANSIENT);
+            if(sqlite3_step(info_insert) != SQLITE_DONE)
+                printf("INFO error: %s\n", sqlite3_errmsg(db));
             break;
-#ifdef MONGOSUPPORT
-        case MONGO:
-            // If a DB of same name already exists, we drop it
-            mongo_c.dropDatabase(TraceName);
-			mongo::BSONArrayBuilder bab;
-            for (int nArg=0; nArg < argc; nArg++)
-                bab.append(argv[nArg]);
-            std::stringstream tool;
-            tool << "Roswell TracerPin " GIT_DESC " / PIN " << PIN_PRODUCT_VERSION_MAJOR << "." << PIN_PRODUCT_VERSION_MINOR << " build " << PIN_BUILD_NUMBER;
-            mongo::BSONObj o = BSON( "created" << mongo::DATENOW << "tool" << tool.str() << "args" << bab.obj());
-            mongo_c.insert(TraceName+".trace", o);
-			mongo_buffer_call.name="call";
-			mongo_buffer_call.i=0;
-			mongo_buffer_call.v=new std::vector< mongo::BSONObj > (MONGO_BUFFER_SIZE);
-			mongo_buffer_bbl.name="bbl";
-			mongo_buffer_bbl.i=0;
-			mongo_buffer_bbl.v=new std::vector< mongo::BSONObj > (MONGO_BUFFER_SIZE);
-			mongo_buffer_read.name="read";
-			mongo_buffer_read.i=0;
-			mongo_buffer_read.v=new std::vector< mongo::BSONObj > (MONGO_BUFFER_SIZE);
-			mongo_buffer_ins.name="ins";
-			mongo_buffer_ins.i=0;
-			mongo_buffer_ins.v=new std::vector< mongo::BSONObj > (MONGO_BUFFER_SIZE);
-			mongo_buffer_write.name="write";
-			mongo_buffer_write.i=0;
-			mongo_buffer_write.v=new std::vector< mongo::BSONObj > (MONGO_BUFFER_SIZE);
-            break;
-#endif //MONGOSUPPORT
     }
 
     IMG_AddInstrumentFunction(ImageLoad_cb, 0);
