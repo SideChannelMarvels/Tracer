@@ -35,6 +35,11 @@ make
 sudo cp -a Tracer /usr/local/bin
 sudo cp -a obj-* /usr/local/bin
 
+# If your default gcc is too recent for PIN, you'll get an error such as:
+# error: #error The C++ ABI of your compiler does not match the ABI of the pin kit.
+# You can tell make to use an older one (provided that you installed it), e.g.:
+make CXX=g++-4.9
+
 Usage:
 ------
 Tracer
