@@ -1,13 +1,18 @@
 # GIT_DESC is provided by external include
 include version.mk
 
-CONFIG_ROOT := $(PIN_ROOT)/source/tools/Config
-include $(CONFIG_ROOT)/makefile.config
-include $(TOOLS_ROOT)/Config/makefile.default.rules
+# To allow sudo make install without mandating root to define PIN_ROOT
+ifneq ("$(PIN_ROOT)", "")
+    CONFIG_ROOT := $(PIN_ROOT)/source/tools/Config
+    include $(CONFIG_ROOT)/makefile.config
+    include $(TOOLS_ROOT)/Config/makefile.default.rules
+endif
 
 TOOL_CXXFLAGS+=-DGIT_DESC=\"$(GIT_DESC)\"
 
 TOOL_LIBS+=-lsqlite3
+
+PREFIX=/usr/local
 
 all: ia32 intel64
 
@@ -22,3 +27,7 @@ intel64:
 clean-all:
 	$(MAKE) TARGET=ia32    clean
 	$(MAKE) TARGET=intel64 clean
+
+install:
+	cp -a Tracer $(PREFIX)/bin
+	cp -a obj-* $(PREFIX)/bin

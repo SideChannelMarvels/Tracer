@@ -31,8 +31,7 @@ Now you're ready to compile TracerPIN and install it.
 
 ```bash
 make
-sudo cp -a Tracer /usr/local/bin
-sudo cp -a obj-* /usr/local/bin
+sudo make install
 ```
 
 If your default gcc is too recent for PIN, you'll get an error such as:
