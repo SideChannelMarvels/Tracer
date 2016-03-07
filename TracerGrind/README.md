@@ -26,8 +26,7 @@ make -j4
 sudo make install
 ```
 
-TextTrace
-^^^^^^^^^
+### TextTrace
 
 TextTrace requires [Capstone](http://www.capstone-engine.org/) (either 2.X or 3.X).
 
@@ -46,8 +45,7 @@ file called `ls.trace`.
 
 The format of this trace file is described in the `trace_protocol.h` header.
 
-TextTrace
-^^^^^^^^^
+### TextTrace
 
 To view this trace in human readeable format you can use the `TextTrace` utility.
 
@@ -63,8 +61,7 @@ type:
 * `[T]` Thread event
 * `[L]` Library load (always at the end)
 
-Filtering
-^^^^^^^^^
+### Filtering
 
 If you trace a large binary you might notice the trace size increase very fast and you might want 
 to only trace specific address ranges or binaries. TracerGrind accepts a comma separated list of 
