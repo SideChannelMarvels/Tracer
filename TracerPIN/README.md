@@ -11,10 +11,12 @@ Installation
 TracerPIN requires the Intel PIN framework to compile and run as well as a few packages. For example on a Debian Jessie one would do:
 
 ```bash
-sudo apt-get install --no-install-recommends wget ca-certificates make g++ libstdc++-4.9-dev libssl-dev libsqlite3-dev
+sudo apt-get install --no-install-recommends wget make g++
+sudo apt-get install --no-install-recommends libstdc++-4.9-dev libssl-dev libsqlite3-dev
 sudo dpkg --add-architecture i386
 sudo apt-get update
-sudo apt-get install --no-install-recommends gcc-multilib g++-multilib libstdc++-4.9-dev:i386 libssl-dev:i386 libsqlite3-dev:i386
+sudo apt-get install --no-install-recommends gcc-multilib g++-multilib
+sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i386 libsqlite3-dev:i386
 ```
 
 Then for Intel PIN, make sure the user has r/w access to the PIN installation and to ease the next steps define PIN_ROOT:
@@ -90,21 +92,50 @@ To visualize this trace with TraceGraph, you need to generate a sqlite database 
 Tracer -t sqlite -o ls.db -- ls
 ```
 
-### Filtering
+### Filtering addresses
 
 If you trace a large binary you might notice the trace size increase very fast and you might want 
 to only trace specific address ranges or binaries. TracerPIN accepts several command line options
 to filter the address range.
 
-TODO
+Option `-f` is used to limit tracing to a given range.
 
+By default (`-f 1`) it's tracing all but system libraries.
+It's possible to force to trace them too: `-f 0` or to trace only the main executable: `-f 2` or to
+provide a range of addresses to trace: `-f 0x400000-0x410000`.
+Option `-f` is about what to instrument when BBLs are getting parsed but it's also possible to give
+indications when to instrument, e.g. when you want to capture only a specific iteration of a loop.
+To do so, use option `-F 0x400000:0x410000`. This time the addresses serve as a start and stop indicators,
+not as an address range, and it's possible to target a specific iteration with the option `-n`,
+while by default all iterations will be recorded.
+
+### Filtering information
+
+You may also want to limit the trace to a subset of information.
+
+By default are logged:
+
+* function calls (without their arguments)
+* basic blocs
+* instructions
+* memory accesses
+
+It's possible to disable any of them and it's possible to enable an experimental tracing of the
+function calls with their arguments, or at least what Intel PIN can find about them.
+Run the tool without arguments to get help about those options.
+
+### Self-modifying code
+
+It's possible to modify the instruction cache size to cope with some self-modifying code, at the cost
+of efficiency, so use it seldomly.
+
+Cf option `-cache n` to limit caching to n instructions and option `-smc_strict 1`.
 
 Credits
 -------
 
 Based on code written by
-* Arnaud Maillet for his NSC2013 challenge writeup (http://kutioo.blogspot.be/2013/05/nosuchcon-2013-challenge-write-up-and.html)
-* tracesurfer for SSTIC2010 (https://code.google.com/p/tartetatintools/)
-* Carlos G. Prado for his Brucon workshop (http://brundlelab.wordpress.com/2013/09/30/brucon-2013-workshop-slides/)
+* Arnaud Maillet for his [NSC2013 challenge writeup](http://kutioo.blogspot.be/2013/05/nosuchcon-2013-challenge-write-up-and.html)
+* tracesurfer for [SSTIC2010](https://code.google.com/p/tartetatintools/)
+* Carlos G. Prado for his [Brucon workshop](http://brundlelab.wordpress.com/2013/09/30/brucon-2013-workshop-slides/)
 * source/tools/SimpleExamples/trace.cpp by Intel
-
