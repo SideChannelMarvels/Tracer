@@ -25,7 +25,7 @@
 
 #include <QDialog>
 #include <QMessageBox>
-#include "mongoclient.h"
+#include "sqliteclient.h"
 
 namespace Ui {
 class MetadataDialog;
@@ -36,12 +36,12 @@ class MetadataDialog : public QDialog
     Q_OBJECT
 
 public:
-    explicit MetadataDialog(MongoClient *mongo_client, QWidget *parent = 0);
+    explicit MetadataDialog(SqliteClient *mongo_client, QWidget *parent = 0);
     ~MetadataDialog();
 
 private:
     Ui::MetadataDialog *ui;
-    MongoClient *mongo_client;
+    SqliteClient *mongo_client;
 
 private slots:
     void onMetadataResults(char **metadata);

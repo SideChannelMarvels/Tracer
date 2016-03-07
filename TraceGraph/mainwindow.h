@@ -29,8 +29,7 @@
 #include <QFileDialog>
 #include <QPixmap>
 #include <string.h>
-#include "mongoclient.h"
-#include "connectdialog.h"
+#include "sqliteclient.h"
 #include "metadatadialog.h"
 #include "tmgraphview.h"
 
@@ -49,7 +48,6 @@ public:
 private slots:
 
     void on_actionMetadata_triggered();
-    void on_actionConnect_triggered();
     void onInvalidDatabase();
     void positionChanged(unsigned long long address, unsigned long long time);
     void cursorPositionChanged(unsigned long long address, unsigned long long time);
@@ -61,10 +59,12 @@ private slots:
 
     void on_actionOverview_zoom_triggered();
 
+    void on_actionOpenDatabase_triggered();
+
 private:
     Ui::MainWindow *ui;
     QThread worker_thread;
-    MongoClient mongo_client;
+    SqliteClient sqlite_client;
     TMGraphView *scene;
 };
 

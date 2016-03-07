@@ -23,14 +23,14 @@
 #include "metadatadialog.h"
 #include "ui_metadatadialog.h"
 
-MetadataDialog::MetadataDialog(MongoClient *mongo_client, QWidget *parent) :
+MetadataDialog::MetadataDialog(SqliteClient *mongo_client, QWidget *parent) :
     QDialog(parent),
     ui(new Ui::MetadataDialog)
 {
     ui->setupUi(this);
     this->mongo_client = mongo_client;
-    connect( mongo_client, &MongoClient::metadataResults, this, &MetadataDialog::onMetadataResults);
-    connect( mongo_client, &MongoClient::statResults, this, &MetadataDialog::onStatResults);
+    connect( mongo_client, &SqliteClient::metadataResults, this, &MetadataDialog::onMetadataResults);
+    connect( mongo_client, &SqliteClient::statResults, this, &MetadataDialog::onStatResults);
     QMetaObject::invokeMethod(mongo_client, "queryMetadata", Qt::QueuedConnection);
     QMetaObject::invokeMethod(mongo_client, "queryStats", Qt::QueuedConnection);
 }
@@ -81,8 +81,7 @@ void MetadataDialog::onStatResults(long long *stats)
 {
     ui->bbl_count->setText(QString::number(stats[0], 10));
     ui->ins_count->setText(QString::number(stats[1], 10));
-    ui->read_count->setText(QString::number(stats[2], 10));
-    ui->write_count->setText(QString::number(stats[3], 10));
+    ui->mem_count->setText(QString::number(stats[2], 10));
 }
 
 void MetadataDialog::mousePressEvent(QMouseEvent * event)

@@ -61,16 +61,6 @@
      </property>
     </widget>
    </item>
-   <item row="8" column="0">
-    <widget class="QLabel" name="label_2">
-     <property name="text">
-      <string>Write operation count:</string>
-     </property>
-     <property name="alignment">
-      <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
    <item row="3" column="0">
     <widget class="QLabel" name="label_7">
      <property name="text">
@@ -81,10 +71,17 @@
      </property>
     </widget>
    </item>
+   <item row="2" column="1">
+    <widget class="QLabel" name="program">
+     <property name="text">
+      <string/>
+     </property>
+    </widget>
+   </item>
    <item row="7" column="0">
     <widget class="QLabel" name="label_4">
      <property name="text">
-      <string>Read operation count:</string>
+      <string>Memory operation count:</string>
      </property>
      <property name="alignment">
       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
@@ -98,13 +95,6 @@
      </property>
      <property name="alignment">
       <set>Qt::AlignRight|Qt::AlignTrailing|Qt::AlignVCenter</set>
-     </property>
-    </widget>
-   </item>
-   <item row="2" column="1">
-    <widget class="QLabel" name="program">
-     <property name="text">
-      <string/>
      </property>
     </widget>
    </item>
@@ -128,17 +118,17 @@
      </property>
     </widget>
    </item>
-   <item row="4" column="0" colspan="2">
-    <widget class="Line" name="line">
-     <property name="orientation">
-      <enum>Qt::Horizontal</enum>
-     </property>
-    </widget>
-   </item>
    <item row="5" column="1">
     <widget class="QLabel" name="bbl_count">
      <property name="text">
       <string/>
+     </property>
+    </widget>
+   </item>
+   <item row="4" column="0" colspan="2">
+    <widget class="Line" name="line">
+     <property name="orientation">
+      <enum>Qt::Horizontal</enum>
      </property>
     </widget>
    </item>
@@ -149,15 +139,8 @@
      </property>
     </widget>
    </item>
-   <item row="8" column="1">
-    <widget class="QLabel" name="write_count">
-     <property name="text">
-      <string/>
-     </property>
-    </widget>
-   </item>
    <item row="7" column="1">
-    <widget class="QLabel" name="read_count">
+    <widget class="QLabel" name="mem_count">
      <property name="text">
       <string/>
      </property>

@@ -20,14 +20,12 @@
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /* ===================================================================== */
-#ifndef MONGOCLIENT_H
-#define MONGOCLIENT_H
+#ifndef SQLITECLIENT_H
+#define SQLITECLIENT_H
 
 #include <QObject>
 #include <QLinkedList>
-#include <bson.h>
-#include <bcon.h>
-#include <mongoc.h>
+#include <sqlite3.h>
 #include <string.h>
 
 enum EVENT_TYPE
@@ -44,20 +42,18 @@ struct Event
     unsigned long long address;
     unsigned int size;
     long long id;
-    long long bbl_id;
     EVENT_TYPE type;
 };
 
 Q_DECLARE_METATYPE(Event)
 
-class MongoClient : public QObject
+class SqliteClient : public QObject
 {
     Q_OBJECT
 public:
-    explicit MongoClient(QObject *parent = 0);
-    ~MongoClient();
-    bool isConnectedToHost() { return client != NULL;}
-    bool isConnectedToDatabase() { return database != NULL;}
+    explicit SqliteClient(QObject *parent = 0);
+    ~SqliteClient();
+    bool isConnectedToDatabase() { return db != NULL;}
 
 signals:
     void connectionResult(char **database_names);
@@ -71,8 +67,7 @@ signals:
     void dbProcessingFinished();
 
 public slots:
-    void connectToHost(QString host);
-    void connectToDatabase(QString database_name);
+    void connectToDatabase(QString filename);
     void queryMetadata();
     void queryStats();
     void queryEvents();
@@ -80,15 +75,7 @@ public slots:
     void cleanup();
 
 private:
-    mongoc_client_t *client;
-    mongoc_database_t *database;
-    mongoc_collection_t *info_collection, *bbl_collection, *ins_collection, *read_collection, *write_collection;
-
-    bson_t* keyExistQuery(char *name);
-    bson_t* IPQuery(char *address);
-    bson_t* orderByQuery(char *field, int direction);
-    Event parseInsEvent(const bson_t *doc);
-    Event parseMemEvent(const bson_t *doc);
+    sqlite3 *db;
 };
 
-#endif // MONGOCLIENT_H
+#endif // SQLITECLIENT_H

@@ -28,38 +28,32 @@ MainWindow::MainWindow(QWidget *parent) :
     ui(new Ui::MainWindow)
 {
     ui->setupUi(this);
-    mongo_client.moveToThread(&worker_thread);
+    sqlite_client.moveToThread(&worker_thread);
     worker_thread.start();
-    connect(&mongo_client, &MongoClient::invalidDatabase, this, &MainWindow::onInvalidDatabase);
+    connect(&sqlite_client, &SqliteClient::invalidDatabase, this, &MainWindow::onInvalidDatabase);
     connect(ui->graph, &TMGraphView::positionChange, this, &MainWindow::positionChanged);
     connect(ui->graph, &TMGraphView::cursorPositionChange, this, &MainWindow::cursorPositionChanged);
     connect(ui->graph_address, &QLineEdit::returnPressed, this, &MainWindow::on_graph_address_editingFinished);
     connect(ui->graph_time, &QLineEdit::returnPressed, this, &MainWindow::on_graph_time_editingFinished);
     //Querying event description is a three party interconnection
-    connect(ui->graph, &TMGraphView::eventDescriptionQueried, &mongo_client, &MongoClient::queryEventDescription);
-    connect(&mongo_client, &MongoClient::receivedEventDescription, ui->event_display, &QTextEdit::setText);
-    ui->graph->setMongoClient(&mongo_client);
+    connect(ui->graph, &TMGraphView::eventDescriptionQueried, &sqlite_client, &SqliteClient::queryEventDescription);
+    connect(&sqlite_client, &SqliteClient::receivedEventDescription, ui->event_display, &QTextEdit::setText);
+    ui->graph->setSqliteClient(&sqlite_client);
 }
 
 MainWindow::~MainWindow()
 {
-    QMetaObject::invokeMethod(&mongo_client, "cleanup", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(&sqlite_client, "cleanup", Qt::QueuedConnection);
     worker_thread.exit();
     worker_thread.wait(1000);
     delete ui;
 }
 
-void MainWindow::on_actionConnect_triggered()
-{
-    ConnectDialog connect_dialog(&mongo_client, this);
-    connect_dialog.exec();
-}
-
 void MainWindow::on_actionMetadata_triggered()
 {
-    if(mongo_client.isConnectedToDatabase())
+    if(sqlite_client.isConnectedToDatabase())
     {
-        MetadataDialog metadata_dialog(&mongo_client, this);
+        MetadataDialog metadata_dialog(&sqlite_client, this);
         metadata_dialog.exec();
     }
     else
@@ -108,11 +102,21 @@ void MainWindow::on_graph_time_editingFinished()
 void MainWindow::on_actionSave_Image_triggered()
 {
     QString filename = QFileDialog::getSaveFileName(this, "Save graph as image");
-    QPixmap image = QPixmap::grabWidget(ui->graph);
-    image.save(filename);
+    if(filename != NULL) {
+        QPixmap image = QPixmap::grabWidget(ui->graph);
+        image.save(filename);
+    }
 }
 
 void MainWindow::on_actionOverview_zoom_triggered()
 {
     ui->graph->zoomToOverview();
+}
+
+void MainWindow::on_actionOpenDatabase_triggered()
+{
+    QString filename = QFileDialog::getOpenFileName(this, "Open database");
+    if(filename != NULL) {
+        QMetaObject::invokeMethod(&sqlite_client, "connectToDatabase", Qt::QueuedConnection, Q_ARG(QString, filename));
+    }
 }

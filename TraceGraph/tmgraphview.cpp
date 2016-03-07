@@ -78,12 +78,12 @@ QSize TMGraphView::minimumSizeHint() const
     return QSize(200, 200);
 }
 
-void TMGraphView::setMongoClient(MongoClient *mongo_client)
+void TMGraphView::setSqliteClient(SqliteClient *sqlite_client)
 {
-    this->mongo_client = mongo_client;
-    connect(mongo_client, &MongoClient::receivedEvent, this, &TMGraphView::onEventReceived);
-    connect(mongo_client, &MongoClient::connectedToDatabase, this, &TMGraphView::onConnectedToDatabase);
-    connect(mongo_client, &MongoClient::dbProcessingFinished, this, &TMGraphView::onDBProcessingFinished);
+    this->sqlite_client = sqlite_client;
+    connect(sqlite_client, &SqliteClient::receivedEvent, this, &TMGraphView::onEventReceived);
+    connect(sqlite_client, &SqliteClient::connectedToDatabase, this, &TMGraphView::onConnectedToDatabase);
+    connect(sqlite_client, &SqliteClient::dbProcessingFinished, this, &TMGraphView::onDBProcessingFinished);
 }
 
 void TMGraphView::onConnectedToDatabase()
@@ -209,7 +209,7 @@ Event TMGraphView::findEventAt(QPoint pos)
 
 void TMGraphView::displayTrace()
 {
-    QMetaObject::invokeMethod(mongo_client, "queryEvents", Qt::QueuedConnection);
+    QMetaObject::invokeMethod(sqlite_client, "queryEvents", Qt::QueuedConnection);
 }
 
 void TMGraphView::timeMove(long long dt)

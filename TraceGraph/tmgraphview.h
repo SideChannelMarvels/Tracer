@@ -34,7 +34,7 @@
 #include <QGuiApplication>
 #include <QDebug>
 #include <string.h>
-#include "mongoclient.h"
+#include "sqliteclient.h"
 #include <math.h>
 
 enum ZoomState
@@ -70,7 +70,7 @@ public:
     explicit TMGraphView(QWidget *parent = 0);
     QSize sizeHint() const;
     QSize minimumSizeHint() const;
-    void setMongoClient(MongoClient *mongo_client);
+    void setSqliteClient(SqliteClient *sqlite_client);
     void displayTrace();
     void timeMove(long long dt);
     void addressMove(long long da);
@@ -91,7 +91,7 @@ public slots:
 private:
     QBrush rbrush, wbrush, rwbrush, ibrush;
     QPen rpen, wpen, rwpen,ipen;
-    MongoClient *mongo_client;
+    SqliteClient *sqlite_client;
     QPainter *painter;
     unsigned long long view_address, view_time;
     unsigned long long total_bytes, total_time;

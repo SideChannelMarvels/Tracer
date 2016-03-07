@@ -14,24 +14,19 @@ TEMPLATE = app
 
 SOURCES += main.cpp\
         mainwindow.cpp \
-    connectdialog.cpp \
-    mongoclient.cpp \
     metadatadialog.cpp \
-    tmgraphview.cpp
+    tmgraphview.cpp \
+    sqliteclient.cpp
 
 HEADERS  += mainwindow.h \
-    connectdialog.h \
-    mongoclient.h \
     metadatadialog.h \
-    tmgraphview.h
+    tmgraphview.h \
+    sqliteclient.h
 
 FORMS    += mainwindow.ui \
-    connectdialog.ui \
     metadatadialog.ui
 
-LIBS += -lbson-1.0 -lmongoc-1.0
+LIBS += -lsqlite3
 
-INCLUDEPATH += /usr/local/include/libmongoc-1.0 /usr/local/include/libbson-1.0
-
-target.path = /usr/local/bin
+target.path = /usr/bin
 INSTALLS += target

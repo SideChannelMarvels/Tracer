@@ -116,7 +116,7 @@
     <property name="title">
      <string>File</string>
     </property>
-    <addaction name="actionConnect"/>
+    <addaction name="actionOpenDatabase"/>
     <addaction name="actionSave_Image"/>
     <addaction name="actionQuit"/>
    </widget>
@@ -139,9 +139,12 @@
    </attribute>
   </widget>
   <widget class="QStatusBar" name="statusBar"/>
-  <action name="actionConnect">
+  <action name="actionOpenDatabase">
    <property name="text">
-    <string>Connect</string>
+    <string>Open Database</string>
+   </property>
+   <property name="toolTip">
+    <string>Open Database</string>
    </property>
   </action>
   <action name="actionSave_Image">

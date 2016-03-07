@@ -35,6 +35,17 @@ make
 sudo make install --prefix=/usr
 ```
 
+### SqliteTrace
+
+SqliteTrace requires [Capstone](http://www.capstone-engine.org/) (either 2.X or 3.X) and 
+[Sqlite] (https://www.sqlite.org/) (tested with 3.11).
+
+```bash
+make
+sudo make install --prefix=/usr
+```
+
+
 Usage
 -----
 
@@ -60,6 +71,13 @@ type:
 * `[I]` Instruction execution
 * `[T]` Thread event
 * `[L]` Library load (always at the end)
+
+### SqliteTrace
+
+To visualize this trace with TraceGraph, you need to generate a sqlite database with the 
+`sqlitetrace` utility.
+
+`sqlitetrace ls.trace ls.db`
 
 ### Filtering
 
