@@ -32,7 +32,7 @@ TextTrace requires [Capstone](http://www.capstone-engine.org/) (either 2.X or 3.
 
 ```bash
 make
-sudo make install --prefix=/usr
+sudo make install PREFIX=/usr
 ```
 
 ### SqliteTrace
@@ -42,7 +42,7 @@ SqliteTrace requires [Capstone](http://www.capstone-engine.org/) (either 2.X or 
 
 ```bash
 make
-sudo make install --prefix=/usr
+sudo make install PREFIX=/usr
 ```
 
 
