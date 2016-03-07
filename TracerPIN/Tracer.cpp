@@ -56,8 +56,14 @@ ADDRINT main_end;
 bool main_reached=false;
 INT32 picklecount=0;
 INT64 logfilter=1;
+bool logfilterlive=false;
 ADDRINT filter_begin=0;
 ADDRINT filter_end=0;
+ADDRINT filter_live_start=0;
+ADDRINT filter_live_stop=0;
+INT32 filter_live_n=0;
+INT32 filter_live_i=0;
+bool filter_live_reached=false;
 long long bigcounter=0; // Ready for 4 billions of instructions
 long long currentbbl=0;
 enum InfoTypeType { T, C, B, R, I, W };
@@ -111,6 +117,10 @@ KNOB<BOOL> KnobLogCallArgs(KNOB_MODE_WRITEONCE, "pintool",
                            "C", "0", "log all calls with their first three args");
 KNOB<string> KnobLogFilter(KNOB_MODE_WRITEONCE, "pintool",
                         "f", "1", "(0) no filter (1) filter system libraries (2) filter all but main exec (0x400000-0x410000) trace only specified address range");
+KNOB<string> KnobLogFilterLive(KNOB_MODE_WRITEONCE, "pintool",
+                        "F", "0", "(0) no live filter (0x400000:0x410000) use addresses as start:stop live filter");
+KNOB<INT> KnobLogFilterLiveN(KNOB_MODE_WRITEONCE, "pintool",
+                           "n", "0", "which occurence to log, 0=all (only for -F start:stop filter)");
 KNOB<INT> KnobCacheIns(KNOB_MODE_WRITEONCE, "pintool",
                         "cache", "0", "(0) default cache size (n) Limit caching to n instructions per trace, useful for SMC (see also -smc_strict 1)");
 #ifdef MONGOSUPPORT
@@ -181,6 +191,23 @@ BOOL ExcludedAddress(ADDRINT ip)
     return FALSE;
 }
 
+BOOL ExcludedAddressLive(ADDRINT ip)
+{
+// Always test for (logfilterlive) before calling this function!
+
+//    cerr << hex << ip << "<>" << filter_live_start << dec << endl;
+    if (ip == filter_live_start) {
+        filter_live_i++;
+        if ((filter_live_n == 0) || (filter_live_i == filter_live_n)) filter_live_reached=true;
+//        cerr << "BEGIN " << filter_live_i << " @" << hex << filter_live_start << dec << " -> " << filter_live_reached << endl;
+    }
+    if (ip == filter_live_stop) {
+        filter_live_reached=false;
+//        cerr << "END   " << filter_live_i << " @" << hex << filter_live_stop << dec << " -> " << filter_live_reached << endl;
+    }
+    return !filter_live_reached;
+}
+
 /* ===================================================================== */
 /* Helper Functions for Instruction_cb                                   */
 /* ===================================================================== */
@@ -197,6 +224,9 @@ VOID pickleAddr(char t, ADDRINT p)
 VOID printInst(ADDRINT ip, string *disass, INT32 size)
 {
     UINT8 value[32];
+    // test on logfilterlive here to avoid calls when not using live filtering
+    if (logfilterlive && ExcludedAddressLive(ip))
+        return;
     if ((size_t)size > sizeof(value))
     {
         cout << "[!] Instruction size > 32 at " << dec << bigcounter << hex << (void *)ip << " " << *disass << endl;
@@ -356,6 +386,9 @@ static VOID RecordMemMongo(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, INT
 static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefetch)
 {
     UINT8 memdump[256];
+    // test on logfilterlive here to avoid calls when not using live filtering
+    if (logfilterlive && ExcludedAddressLive(ip))
+        return;
     PIN_GetLock(&lock, ip);
     if ((size_t)size > sizeof(memdump))
     {
@@ -878,8 +911,12 @@ int  main(int argc, char *argv[])
         filter_begin=logfilter;
         logfilter = 3;
         char *endptr2;
+        if (endptr[0] != '-') {
+            cerr << "ERR: Failed parsing option -f" <<endl;
+            return 1;
+        }
         filter_end=strtoull(endptr+1, &endptr2, 16);
-        if (endptr2 == endptr) {
+        if (endptr2 == endptr+1) {
             cerr << "ERR: Failed parsing option -f" <<endl;
             return 1;
         }
@@ -892,6 +929,35 @@ int  main(int argc, char *argv[])
             return 1;
         }
     }
+    const char *tmpfilterlive = KnobLogFilterLive.Value().c_str();
+    INT64 tmpval=strtoull(tmpfilterlive, &endptr, 16);
+    if (tmpval != 0) logfilterlive=true;
+    if (endptr == tmpfilterlive) {
+        cerr << "ERR: Failed parsing option -F" <<endl;
+        return 1;
+    }
+    if ((endptr[0] == '\0') && (logfilterlive)) {
+        cerr << "ERR: Failed parsing option -F" <<endl;
+        return 1;
+    }
+    if (tmpval > 0) {
+        filter_live_start=tmpval;
+        char *endptr2;
+        if (endptr[0] != ':') {
+            cerr << "ERR: Failed parsing option -F" <<endl;
+            return 1;
+        }
+        filter_live_stop=strtoull(endptr+1, &endptr2, 16);
+        if (endptr2 == endptr+1) {
+            cerr << "ERR: Failed parsing option -F" <<endl;
+            return 1;
+        }
+        if (endptr2[0] != '\0') {
+            cerr << "ERR: Failed parsing option -F" <<endl;
+            return 1;
+        }
+    }
+    filter_live_n = KnobLogFilterLiveN.Value();
 
     // Against very local self-modifying code, you can aggressively invalidate cache by making it small:
     if (KnobCacheIns.Value()) {
