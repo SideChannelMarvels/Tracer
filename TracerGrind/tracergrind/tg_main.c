@@ -284,6 +284,7 @@ static void tg_print_usage(void)
 {  
     VG_(printf)(
         "    --output=<name>           trace output file name\n"
+        "    --filter=<list>           list of comma separated address ranges or binaries to filter\n"
     );
 }
 
