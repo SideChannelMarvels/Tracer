@@ -20,6 +20,8 @@
 /* You should have received a copy of the GNU General Public License     */
 /* along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 /* ===================================================================== */
+#define _FILE_OFFSET_BITS 64 
+
 #include <stdio.h>
 #include <string.h>
 #include <capstone/capstone.h>
@@ -55,8 +57,8 @@ int main(int argc, char **argv)
         printf("Usage: texttrace <input> <output>\n");
         return 1;
     }
-    trace = fopen64(argv[1], "rb");
-    texttrace = fopen64(argv[2], "w");
+    trace = fopen(argv[1], "rb");
+    texttrace = fopen(argv[2], "w");
     if(trace == NULL)
     {
         printf("Could not open file %s for reading\n", argv[1]);

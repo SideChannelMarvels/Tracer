@@ -1,10 +1,26 @@
 CC=gcc
-CPPFLAGS=-O3
+CFLAGS=-O3
 LDLIBS=-lcapstone
+TARGET=texttrace
 SOURCES=texttrace.c
 OBJECTS=$(SOURCES:.c=.o)
+PREFIX=/usr
 
-all: $(SOURCES) texttrace
+.PHONY: default all clean check install uninstall
 
-install: all
-	cp texttrace /usr/local/bin/
+all: $(TARGET) 
+
+%.o: %.c
+	$(CC) $(CFLAGS) -c $< -o $@
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(CFLAGS) $< -o $@ $(LDLIBS)
+
+clean:
+	@-rm -f *.o $(TARGET)
+
+install:
+	@cp $(TARGET) $(PREFIX)/bin/
+
+uninstall:
+	@rm $(PREFIX)/bin/$(TARGET)
