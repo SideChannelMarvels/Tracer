@@ -8,6 +8,14 @@ Installation
 
 TraceGraph requires [Qt5] (http://www.qt.io/) and [Sqlite] (https://www.sqlite.org/).
 
+For example on a Debian Jessie one would do:
+
+```bash
+sudo apt-get install build-essential qt5-qmake qtbase5-dev-tools qtbase5-dev libsqlite3-dev
+```
+
+Then, to compile and install TraceGraph:
+
 ```bash
 qmake -qt=5
 make
