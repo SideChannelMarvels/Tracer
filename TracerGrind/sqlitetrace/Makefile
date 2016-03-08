@@ -4,7 +4,7 @@ LDLIBS=-lcapstone -lsqlite3
 TARGET=sqlitetrace
 SOURCES=sqlitetrace.c
 OBJECTS=$(SOURCES:.c=.o)
-PREFIX=/usr
+PREFIX=/usr/local
 
 .PHONY: default all clean check install uninstall
 

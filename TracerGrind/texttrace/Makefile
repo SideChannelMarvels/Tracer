@@ -4,7 +4,7 @@ LDLIBS=-lcapstone
 TARGET=texttrace
 SOURCES=texttrace.c
 OBJECTS=$(SOURCES:.c=.o)
-PREFIX=/usr
+PREFIX=/usr/local
 
 .PHONY: default all clean check install uninstall
 
