@@ -20,8 +20,8 @@ tar xf valgrind-3.11.0.tar.bz2
 cp -r tracergrind valgrind-3.11.0/
 patch -p0 < valgrind-3.11.0.diff
 cd valgrind-3.11.0/
-./configure --prefix=/usr
 ./autogen.sh
+./configure --prefix=/usr
 make -j4
 sudo make install
 ```
