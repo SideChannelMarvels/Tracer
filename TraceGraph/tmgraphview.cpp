@@ -56,6 +56,7 @@ TMGraphView::TMGraphView(QWidget *parent) :
     view_time = 0;
     total_time = 0;
     size_factor = 1;
+    size_px = 1;
     address_zoom_factor = 1;
     time_zoom_factor = 1;
     zoom_state = NO_ZOOM;
@@ -197,7 +198,10 @@ Event TMGraphView::findEventAt(QPoint pos)
             {
                 if(time < event_it->time)
                     break; // We are too far in time
-                else if(time == event_it->time && address >= event_it->address && address < event_it->address + event_it->size)
+                else if(time >= event_it->time &&
+                        time < (event_it->time + max(1, size_px/time_zoom_factor)) &&
+                        address >= event_it->address &&
+                        address < event_it->address + max(event_it->size, size_px/address_zoom_factor))
                     return *event_it; // Found it!
             }
         }
@@ -303,6 +307,16 @@ void TMGraphView::keyPressEvent(QKeyEvent * event)
     else if(event->key() == Qt::Key_Right)
     {
         addressMove((long)(width()*speed/address_zoom_factor));
+        update();
+    }
+    else if(event->key() == Qt::Key_Plus)
+    {
+        size_px+=1;
+        update();
+    }
+    else if(event->key() == Qt::Key_Minus)
+    {
+        size_px=max(size_px-1,1);
         update();
     }
 }
@@ -436,8 +450,8 @@ void TMGraphView::paintEvent(QPaintEvent *event)
                          setColor(event_it->type);
                          painter->drawRect((realAddressToDisplayAddress(event_it->address) - view_address)*address_zoom_factor,
                                            (event_it->time - view_time)*time_zoom_factor,
-                                            max(event_it->size*address_zoom_factor, 1)*size_factor,
-                                            max(time_zoom_factor, 1)*size_factor);
+                                            max(event_it->size*address_zoom_factor, size_px)*size_factor,
+                                            max(time_zoom_factor, size_px)*size_factor);
                      }
                      event_it++;
                  }
