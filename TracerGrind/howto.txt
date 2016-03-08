@@ -1,12 +1,3 @@
-
-Installing TracerGrind
-----------------------
-# Installation notes tested on Debian Jessie
-# First install some essential packages before starting
-sudo apt-get install build-essential automake libcapstone-dev
-# You probably also want to have MongoDB for the traces
-sudo apt-get install mongodb mongodb-clients
-
 Usage with Wine:
 ----------------
 Run another exe in wine first to keep wineserver up & running

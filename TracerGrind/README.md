@@ -8,7 +8,23 @@ X86, X86_64 and ARM.
 Installation
 ------------
 
-TracerGrind requires the complete Valgrind sources to compile. The plugin sources have to be copied 
+TracerGrind requires the complete Valgrind sources to compile as well as a few packages.
+
+For example on a Debian Jessie one would do:
+
+```bash
+sudo apt-get install build-essential automake libcapstone-dev libsqlite3-dev
+```
+
+And to add support for i386 on an amd64 platform:
+
+```bash
+sudo dpkg --add-architecture i386
+sudo apt-get update
+sudo apt-get install --yes --no-install-recommends gcc-multilib
+```
+
+The plugin sources have to be copied 
 inside Valgrind tree and a few configuration files have to be modified. Those modifications are 
 described in patch files provided for Valgrind 3.11.0 and Valgrind 3.10.1. Below are the full 
 list of commands required to compile it. You can use a different installation prefix than /usr 
