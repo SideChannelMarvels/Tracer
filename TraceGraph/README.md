@@ -22,6 +22,9 @@ make
 sudo make install
 ```
 
+By default tracegraph installed in /usr/bin. If you want to change destination, edit tracegraph.pro
+and adapt `target.path = /usr/bin` to your needs.
+
 Usage
 -----
 
