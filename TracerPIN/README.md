@@ -8,7 +8,9 @@ X86 and X86_64.
 Installation
 ------------
 
-TracerPIN requires the Intel PIN framework to compile and run as well as a few packages. For example on a Debian Jessie one would do:
+TracerPIN requires the Intel PIN framework to compile and run as well as a few packages.
+
+For example on a Debian Jessie one would do:
 
 ```bash
 sudo apt-get install --no-install-recommends wget make g++

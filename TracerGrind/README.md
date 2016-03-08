@@ -28,7 +28,7 @@ The plugin sources have to be copied
 inside Valgrind tree and a few configuration files have to be modified. Those modifications are 
 described in patch files provided for Valgrind 3.11.0 and Valgrind 3.10.1. Below are the full 
 list of commands required to compile it. You can use a different installation prefix than /usr 
-(which would overwritte a distribution installation of Valgrind).
+(which would overwrite a distribution installation of Valgrind), the default being /usr/local.
 
 ```bash
 wget 'http://valgrind.org/downloads/valgrind-3.11.0.tar.bz2'
