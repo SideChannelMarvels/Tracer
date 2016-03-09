@@ -24,11 +24,11 @@ sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i
 Then for Intel PIN, make sure the user has r/w access to the PIN installation and to ease the next steps define PIN_ROOT:
 
 ```bash
-wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.13-65163-gcc.4.4.7-linux.tar.gz
-tar xzf pin-2.13-65163-gcc.4.4.7-linux.tar.gz
-sudo mv pin-2.13-65163-gcc.4.4.7-linux /opt
-export PIN_ROOT=/opt/pin-2.13-65163-gcc.4.4.7-linux
-echo -e "\nexport PIN_ROOT=/opt/pin-2.13-65163-gcc.4.4.7-linux" >> ~/.bashrc
+wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-71313-gcc.4.4.7-linux.tar.gz
+tar xzf pin-2.14-71313-gcc.4.4.7-linux.tar.gz
+mv pin-2.14-71313-gcc.4.4.7-linux /opt
+export PIN_ROOT=/opt/pin-2.14-71313-gcc.4.4.7-linux
+echo -e "\nexport PIN_ROOT=/opt/pin-2.14-71313-gcc.4.4.7-linux" >> ~/.bashrc
 ```
 
 Now you're ready to compile TracerPIN and install it.
