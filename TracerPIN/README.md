@@ -133,6 +133,23 @@ of efficiency, so use it seldomly.
 
 Cf option `-cache n` to limit caching to n instructions and option `-smc_strict 1`.
 
+Troubleshooting
+---------------
+
+We noticed the following problem using PIN on IA32 binaries on Debian Stretch under a Linux kernel > 4.3:
+
+```
+A: Source/pin/vm_ia32_l/jit_region_ia32_linux.cpp: XlateSysCall: 33: Sysenter is supported on IA32 only and the expected location is inside Linux Gate
+
+################################################################################
+## STACK TRACE
+################################################################################
+etc
+```
+
+Strangely enough, running a Debian Jessie in a Docker with the same kernel > 4.3 works fine.  
+So till the root cause of this issue is found, please either make sure to run a kernel <= 4.3 or to run from a Docker image with Debian Jessie.
+
 Credits
 -------
 
