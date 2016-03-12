@@ -122,6 +122,11 @@ int main(int argc, char **argv)
                     arch = CS_ARCH_X86;
                     mode = CS_MODE_32;
                 }
+                else if(strcmp(value, "ARM64") == 0)
+                {
+                    arch = CS_ARCH_ARM64;
+                    mode = CS_MODE_ARM;
+                }
                 else if(strcmp(value, "ARM") == 0)
                 {
                     arch = CS_ARCH_ARM;
