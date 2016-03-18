@@ -811,6 +811,7 @@ VOID Fini(INT32 code, VOID *v)
             sqlite3_finalize(bbl_insert);
             sqlite3_finalize(ins_insert);
             sqlite3_finalize(mem_insert);
+            sqlite3_finalize(call_insert);
             sqlite3_finalize(thread_insert);
             sqlite3_finalize(thread_update);
             if(sqlite3_close(db) != SQLITE_OK)
