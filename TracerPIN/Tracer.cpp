@@ -364,6 +364,7 @@ static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefe
     if ((size_t)size > sizeof(memdump))
     {
         cout << "[!] Memory size > " << sizeof(memdump) << " at " << dec << bigcounter << hex << (void *)ip << " " << (void *)addr << endl;
+        PIN_ReleaseLock(&lock);
         return;
     }
     PIN_SafeCopy(memdump, (void *)addr, size);
