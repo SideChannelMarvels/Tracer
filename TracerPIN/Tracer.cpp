@@ -62,6 +62,7 @@ ADDRINT filter_live_stop=0;
 INT32 filter_live_n=0;
 INT32 filter_live_i=0;
 bool filter_live_reached=false;
+bool quiet=false;
 long long bigcounter=0; // Ready for 4 billions of instructions
 long long currentbbl=0;
 enum InfoTypeType { T, C, B, R, I, W };
@@ -109,6 +110,8 @@ KNOB<INT> KnobCacheIns(KNOB_MODE_WRITEONCE, "pintool",
                         "cache", "0", "(0) default cache size (n) Limit caching to n instructions per trace, useful for SMC (see also -smc_strict 1)");
 KNOB<string> KnobLogType(KNOB_MODE_WRITEONCE, "pintool",
                          "t", "human", "log type: human/sqlite");
+KNOB<BOOL> KnobQuiet(KNOB_MODE_WRITEONCE, "pintool",
+                       "q", "0", "be quiet under normal conditions");
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -927,7 +930,9 @@ int  main(int argc, char *argv[])
                 cerr << "[!] Something went wrong opening the log file..." << endl;
                 return -1;
             } else {
-                cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+                if (! KnobQuiet.Value()) {
+                    cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+                }
             }
             break;
         case SQLITE:
@@ -942,7 +947,9 @@ int  main(int argc, char *argv[])
                 cerr << "Could not setup database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
                 return -1;
             }
-            cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+            if (! KnobQuiet.Value()) {
+                cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+            }
             sqlite3_prepare_v2(db, "INSERT INTO info (key, value) VALUES (?, ?);", -1, &info_insert, NULL);
             sqlite3_prepare_v2(db, "INSERT INTO lib (name, base, end) VALUES (?, ?, ?);", -1, &lib_insert, NULL);
             sqlite3_prepare_v2(db, "INSERT INTO bbl (addr, addr_end, size, thread_id) VALUES (?, ?, ?, ?);", -1, &bbl_insert, NULL);
