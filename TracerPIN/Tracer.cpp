@@ -199,7 +199,7 @@ VOID printInst(ADDRINT ip, string *disass, INT32 size)
         return;
     if ((size_t)size > sizeof(v))
     {
-        cout << "[!] Instruction size > 32 at " << dec << bigcounter << hex << (void *)ip << " " << *disass << endl;
+        cerr << "[!] Instruction size > 32 at " << dec << bigcounter << hex << (void *)ip << " " << *disass << endl;
         return;
     }
     PIN_GetLock(&lock, ip);
@@ -363,7 +363,7 @@ static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefe
     PIN_GetLock(&lock, ip);
     if ((size_t)size > sizeof(memdump))
     {
-        cout << "[!] Memory size > " << sizeof(memdump) << " at " << dec << bigcounter << hex << (void *)ip << " " << (void *)addr << endl;
+        cerr << "[!] Memory size > " << sizeof(memdump) << " at " << dec << bigcounter << hex << (void *)ip << " " << (void *)addr << endl;
         PIN_ReleaseLock(&lock);
         return;
     }
@@ -616,7 +616,7 @@ void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
     }
     catch (int e)
     {
-        cout << "[!] Exception when trying to recover call args: " << e << endl;
+        cerr << "[!] Exception when trying to recover call args: " << e << endl;
     }
 
     PIN_GetLock(&lock, ip);
@@ -817,7 +817,7 @@ VOID Fini(INT32 code, VOID *v)
             sqlite3_finalize(thread_update);
             if(sqlite3_close(db) != SQLITE_OK)
             {
-                cout << "Failed to close db (wut?): " << sqlite3_errmsg(db) << endl;
+                cerr << "Failed to close db (wut?): " << sqlite3_errmsg(db) << endl;
             }
             break;
     }
@@ -924,25 +924,25 @@ int  main(int argc, char *argv[])
             TraceFile.open(TraceName.c_str());
             if(TraceFile == NULL)
             {
-                cout << "[!] Something went wrong opening the log file..." << endl;
+                cerr << "[!] Something went wrong opening the log file..." << endl;
                 return -1;
             } else {
-                cout << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+                cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
             }
             break;
         case SQLITE:
             remove(TraceName.c_str());
             if(sqlite3_open(TraceName.c_str(), &db) != SQLITE_OK)
             {
-                cout << "Could not open database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
+                cerr << "Could not open database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
                 return -1;
             }
             if(sqlite3_exec(db, SETUP_QUERY, NULL, NULL, NULL) != SQLITE_OK)
             {
-                cout << "Could not setup database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
+                cerr << "Could not setup database " << TraceName << ":" << sqlite3_errmsg(db) << endl;
                 return -1;
             }
-            cout << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
+            cerr << "[*] Trace file " << TraceName << " opened for writing..." << endl << endl;
             sqlite3_prepare_v2(db, "INSERT INTO info (key, value) VALUES (?, ?);", -1, &info_insert, NULL);
             sqlite3_prepare_v2(db, "INSERT INTO lib (name, base, end) VALUES (?, ?, ?);", -1, &lib_insert, NULL);
             sqlite3_prepare_v2(db, "INSERT INTO bbl (addr, addr_end, size, thread_id) VALUES (?, ?, ?, ?);", -1, &bbl_insert, NULL);
