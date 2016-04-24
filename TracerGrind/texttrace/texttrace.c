@@ -66,7 +66,7 @@ int main(int argc, char **argv)
     }
     if(texttrace == NULL)
     {
-        printf("Could not open file %s for writting\n", argv[2]);
+        printf("Could not open file %s for writing\n", argv[2]);
         return 3;
     }
     while(fread((void*)&(msg.type), 1, 1, trace) != 0)
