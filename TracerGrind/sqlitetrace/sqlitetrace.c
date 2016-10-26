@@ -132,6 +132,14 @@ int main(int argc, char **argv)
                     arch = CS_ARCH_ARM;
                     mode = CS_MODE_ARM;
                 }
+                else if(strcmp(value, "PPC64") == 0)
+                {   
+                    arch = CS_ARCH_PPC;
+                    mode = CS_MODE_64; 
+#if __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+                    mode =| CS_MODE_BIG_ENDIAN;
+#endif
+                } 
                 cs_open(arch, mode, &capstone_handle);
             }
             sqlite3_reset(info_insert);
