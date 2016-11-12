@@ -84,7 +84,7 @@ void MetadataDialog::onStatResults(long long *stats)
     ui->mem_count->setText(QString::number(stats[2], 10));
 }
 
-void MetadataDialog::mousePressEvent(QMouseEvent * event)
+void MetadataDialog::mousePressEvent(QMouseEvent* /*event*/)
 {
     this->destroy();
 }

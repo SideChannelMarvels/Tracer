@@ -218,9 +218,9 @@ void TMGraphView::displayTrace()
 
 void TMGraphView::timeMove(long long dt)
 {
-    if(dt < 0 && -dt > view_time)
+    if(dt < 0 && view_time + dt > view_time)
         view_time = 0;
-    else if(dt > 0 && dt > 0xFFFFFFFFFFFFFFFF - view_time)
+    else if(dt > 0 && view_time + dt < view_time)
         view_time = 0xFFFFFFFFFFFFFFFF;
     else
         view_time += dt;
@@ -229,9 +229,9 @@ void TMGraphView::timeMove(long long dt)
 
 void TMGraphView::addressMove(long long da)
 {
-    if(da < 0 && -da > view_address)
+    if(da < 0 && view_address + da > view_address)
         view_address = 0;
-    else if(da > 0 && da > 0xFFFFFFFFFFFFFFFF - view_address)
+    else if(da > 0 && view_address + da < view_address)
         view_address = 0xFFFFFFFFFFFFFFFF;
     else
         view_address += da;
@@ -415,7 +415,7 @@ void TMGraphView::setColor(EVENT_TYPE type)
     }
 }
 
-void TMGraphView::paintEvent(QPaintEvent *event)
+void TMGraphView::paintEvent(QPaintEvent* /*event*/)
 {
     painter->begin(this);
     painter->setRenderHint(QPainter::Antialiasing, true);

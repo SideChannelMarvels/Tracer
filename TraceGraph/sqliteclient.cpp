@@ -48,7 +48,6 @@ void SqliteClient::connectToDatabase(QString filename)
 
 void SqliteClient::queryMetadata()
 {
-    unsigned int length;
     char **metadata = new char*[4];
     sqlite3_stmt *key_query;
 
@@ -123,7 +122,6 @@ void SqliteClient::queryStats()
 void SqliteClient::queryEvents()
 {
     unsigned long long time = 0;
-    bool querying = true;
     sqlite3_stmt *ins_query, *mem_query;
 
 
