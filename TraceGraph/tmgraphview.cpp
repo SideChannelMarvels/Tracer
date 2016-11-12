@@ -162,7 +162,12 @@ void TMGraphView::regionProcessing()
         }
         regions.append(r);
     }
-    total_bytes = regions.back().display_address + regions.back().size;
+    if(regions.size() > 0) {
+        total_bytes = regions.back().display_address + regions.back().size;
+    }
+    else {
+        total_bytes = 0;
+    }
 }
 
 unsigned long long  TMGraphView::realAddressToDisplayAddress(unsigned long long address)
@@ -256,8 +261,18 @@ void TMGraphView::zoomToOverview()
 {
     view_address = 0;
     view_time = 0;
-    address_zoom_factor = width()/(double)total_bytes;
-    time_zoom_factor = height()/(double)total_time;
+    if(total_bytes != 0) {
+        address_zoom_factor = width()/(double)total_bytes;
+    }
+    else {
+        address_zoom_factor = 1.0;
+    }
+    if(total_time != 0) {
+        time_zoom_factor = height()/(double)total_time;
+    }
+    else {
+        time_zoom_factor = 1.0;
+    }
     emit positionChange(displayAddressToRealAddress(view_address), view_time);
     update();
 }

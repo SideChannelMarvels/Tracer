@@ -37,7 +37,27 @@ void SqliteClient::connectToDatabase(QString filename)
 {
     if(sqlite3_open_v2(filename.toUtf8().constData(), &db, SQLITE_OPEN_READONLY, NULL) == SQLITE_OK)
     {
-        emit connectedToDatabase();
+        sqlite3_stmt *key_query;
+
+        sqlite3_prepare_v2(db, "SELECT value FROM info where key=?;", -1, &key_query, NULL);
+
+        sqlite3_bind_text(key_query, 1, "TRACERGRIND_VERSION", -1, SQLITE_TRANSIENT);
+        if(sqlite3_step(key_query) == SQLITE_ROW) {
+            emit connectedToDatabase();
+            sqlite3_finalize(key_query);
+            return;
+        }
+        sqlite3_reset(key_query);
+
+        sqlite3_bind_text(key_query, 1, "TRACERPIN_VERSION", -1, SQLITE_TRANSIENT);
+        if(sqlite3_step(key_query) == SQLITE_ROW) {
+            emit connectedToDatabase();
+            sqlite3_finalize(key_query);
+            return;
+        }
+        sqlite3_finalize(key_query);
+        cleanup();
+        emit invalidDatabase();
     }
     else
     {
@@ -48,53 +68,81 @@ void SqliteClient::connectToDatabase(QString filename)
 
 void SqliteClient::queryMetadata()
 {
-    char **metadata = new char*[4];
+    char** metadata = new char*[4];
     sqlite3_stmt *key_query;
+
+    metadata[0] = NULL;
+    metadata[1] = NULL;
+    metadata[2] = NULL;
+    metadata[3] = NULL;
 
     sqlite3_prepare_v2(db, "SELECT value FROM info where key=?;", -1, &key_query, NULL);
 
+    metadata[0] = NULL;
     sqlite3_bind_text(key_query, 1, "TRACERGRIND_VERSION", -1, SQLITE_TRANSIENT);
     if(sqlite3_step(key_query) == SQLITE_ROW)
     {
         const char *value = (const char*) sqlite3_column_text(key_query, 0);
-        metadata[0] = new char[strlen(value)+1];
-        strcpy(metadata[0], value);
+        if(value != NULL) {
+            metadata[0] = new char[strlen(value)+1];
+            strcpy(metadata[0], value);
+        }
     }
-    else
-        metadata[0] = NULL;
+    sqlite3_reset(key_query);
+
+    sqlite3_bind_text(key_query, 1, "TRACERPIN_VERSION", -1, SQLITE_TRANSIENT);
+    if(sqlite3_step(key_query) == SQLITE_ROW)
+    {
+        const char *value = (const char*) sqlite3_column_text(key_query, 0);
+        if(value != NULL) {
+            metadata[0] = new char[strlen(value)+1];
+            strcpy(metadata[0], value);
+        }
+    }
     sqlite3_reset(key_query);
 
     sqlite3_bind_text(key_query, 1, "ARCH", -1, SQLITE_TRANSIENT);
     if(sqlite3_step(key_query) == SQLITE_ROW)
     {
         const char *value = (const char*) sqlite3_column_text(key_query, 0);
-        metadata[1] = new char[strlen(value)+1];
-        strcpy(metadata[1], value);
+        if(value != NULL) {
+            metadata[1] = new char[strlen(value)+1];
+            strcpy(metadata[1], value);
+        }
     }
-    else
-        metadata[1] = NULL;
     sqlite3_reset(key_query);
 
     sqlite3_bind_text(key_query, 1, "PROGRAM", -1, SQLITE_TRANSIENT);
     if(sqlite3_step(key_query) == SQLITE_ROW)
     {
         const char *value = (const char*) sqlite3_column_text(key_query, 0);
-        metadata[2] = new char[strlen(value)+1];
-        strcpy(metadata[2], value);
+        if(value != NULL) {
+            metadata[2] = new char[strlen(value)+1];
+            strcpy(metadata[2], value);
+        }
     }
-    else
-        metadata[2] = NULL;
+    sqlite3_reset(key_query);
+
+    sqlite3_bind_text(key_query, 1, "PINPROGRAM", -1, SQLITE_TRANSIENT);
+    if(sqlite3_step(key_query) == SQLITE_ROW)
+    {
+        const char *value = (const char*) sqlite3_column_text(key_query, 0);
+        if(value != NULL) {
+            metadata[2] = new char[strlen(value)+1];
+            strcpy(metadata[2], value);
+        }
+    }
     sqlite3_reset(key_query);
 
     sqlite3_bind_text(key_query, 1, "ARGS", -1, SQLITE_TRANSIENT);
     if(sqlite3_step(key_query) == SQLITE_ROW)
     {
         const char *value = (const char*) sqlite3_column_text(key_query, 0);
-        metadata[3] = new char[strlen(value)+1];
-        strcpy(metadata[3], value);
+        if(value != NULL) {
+            metadata[3] = new char[strlen(value)+1];
+            strcpy(metadata[3], value);
+        }
     }
-    else
-        metadata[3] = NULL;
     sqlite3_finalize(key_query);
 
     emit metadataResults(metadata);

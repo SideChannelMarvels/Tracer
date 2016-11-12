@@ -40,34 +40,39 @@ MetadataDialog::~MetadataDialog()
     delete ui;
 }
 
-void MetadataDialog::onMetadataResults(char **metadata)
+void MetadataDialog::onMetadataResults(char* metadata[4])
 {
     if(metadata)
     {
         if(metadata[0])
         {
             ui->version->setText(metadata[0]);
+            delete metadata[0];
         }
         else
             ui->version->setText("not found");
         if(metadata[1])
         {
             ui->architecture->setText(metadata[1]);
+            delete metadata[1];
         }
         else
             ui->architecture->setText("not found");
         if(metadata[2])
         {
             ui->program->setText(metadata[2]);
+            delete metadata[2];
         }
         else
             ui->program->setText("not found");
         if(metadata[3])
         {
             ui->arguments->setText(metadata[3]);
+            delete metadata[3];
         }
         else
             ui->arguments->setText("not found");
+        delete metadata;
     }
     else
     {
