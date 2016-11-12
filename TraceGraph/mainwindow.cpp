@@ -49,6 +49,10 @@ MainWindow::~MainWindow()
     delete ui;
 }
 
+void MainWindow::openFile(const char* filename) {
+    QMetaObject::invokeMethod(&sqlite_client, "connectToDatabase", Qt::QueuedConnection, Q_ARG(QString, QString(filename)));
+}
+
 void MainWindow::on_actionMetadata_triggered()
 {
     if(sqlite_client.isConnectedToDatabase())
