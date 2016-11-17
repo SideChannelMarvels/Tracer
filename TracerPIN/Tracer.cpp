@@ -297,7 +297,7 @@ static VOID RecordMemSqlite(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, IN
 {
     // Insert read or write
     sqlite3_reset(mem_insert);
-    sqlite3_bind_int64(mem_insert, 1, ins_id);
+    sqlite3_bind_int64(mem_insert, 1, r == 'R' ? (ins_id+1) : ins_id );
     value.str("");
     value.clear();
     value << hex << "0x" << setfill('0') << setw(16) << ip;
