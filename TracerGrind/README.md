@@ -26,16 +26,17 @@ sudo apt-get install --yes --no-install-recommends gcc-multilib
 
 The plugin sources have to be copied 
 inside Valgrind tree and a few configuration files have to be modified. Those modifications are 
-described in patch files provided for Valgrind 3.11.0 and Valgrind 3.10.1. Below are the full 
-list of commands required to compile it. You can use a different installation prefix than /usr 
-(which would overwrite a distribution installation of Valgrind), the default being /usr/local.
+described in patch files provided for Valgrind 3.12.0, Valgrind 3.11.0 and Valgrind 3.10.1. Below 
+are the full list of commands required to compile it. You can use a different installation prefix 
+than /usr (which would overwrite a distribution installation of Valgrind), the default being 
+/usr/local.
 
 ```bash
-wget 'http://valgrind.org/downloads/valgrind-3.11.0.tar.bz2'
-tar xf valgrind-3.11.0.tar.bz2
-cp -r tracergrind valgrind-3.11.0/
-patch -p0 < valgrind-3.11.0.diff
-cd valgrind-3.11.0/
+wget 'http://valgrind.org/downloads/valgrind-3.12.0.tar.bz2'
+tar xf valgrind-3.12.0.tar.bz2
+cp -r tracergrind valgrind-3.12.0/
+patch -p0 < valgrind-3.12.0.diff
+cd valgrind-3.12.0/
 ./autogen.sh
 ./configure --prefix=/usr
 make -j4
