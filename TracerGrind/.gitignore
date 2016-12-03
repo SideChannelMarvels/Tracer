@@ -2,3 +2,4 @@ sqlitetrace/sqlitetrace
 texttrace/texttrace
 valgrind-*/
 valgrind-*.tar.bz2
+*.o
