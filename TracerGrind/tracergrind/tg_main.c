@@ -331,8 +331,8 @@ static void tg_post_clo_init(void)
         tg_print_usage();
         VG_(exit)(1);
     }
-    sres = VG_(open)(trace_output_filename, VKI_O_CREAT|VKI_O_TRUNC|VKI_O_WRONLY,
-                                VKI_S_IRUSR|VKI_S_IWUSR|VKI_S_IRGRP|VKI_S_IWGRP);
+    sres = VG_(open)(trace_output_filename, VKI_O_CREAT|VKI_O_TRUNC|VKI_O_WRONLY|VKI_O_LARGEFILE,
+                                                VKI_S_IRUSR|VKI_S_IWUSR|VKI_S_IRGRP|VKI_S_IWGRP);
     if(sr_isError(sres))
     {
         VG_(umsg)("Error: cannot create trace file %s\n", trace_output_filename);
