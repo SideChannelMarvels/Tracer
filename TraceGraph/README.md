@@ -45,7 +45,7 @@ of a binary is usually too sparse to display in full on the screen, this is why 
 memory pages which are never addressed in the trace from the graph. Those cuts are represented by 
 orange vertical lines with the start address of the visible block written at the bottom.
 
-You can also click on a block (this is tricky, they are small ...) to obtain informations which 
+You can also click on a block (*) to obtain informations which 
 will be displayed on the right pane. The complete command list:
 
 * arrow keys: move arround.
@@ -59,6 +59,10 @@ will be displayed on the right pane. The complete command list:
 * shift + scroll down: zoom out on time axis only.
 * right click drag: zoom in the dragged rectangle.
 * ctrl + right click drag: zoom out form the dragged rectangle.
+* +: increase block size
+* -: decrease block size (up to 1 pixel)
 
 Additionally you can save a image of the graph currently on screen (you know, for making slides 
 and stuff ;D).
+
+(*) to ease that process, you can increase temporarily the blocks size (press "+" several times).
