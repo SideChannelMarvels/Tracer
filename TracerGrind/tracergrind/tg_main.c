@@ -41,7 +41,14 @@ static uint64_t exec_id = 0;
 
 #define MAX_MEMORY_EVENT 4096
 #define MAX_CODE_EVENT 4096
-#define BUFFER_SIZE 32768
+// Assume any instruction on any platform fits in 32 bytes
+#define MAX_CODE_SIZE (32 * MAX_CODE_EVENT)
+// Assume largest read/write is of 128 bytes
+#define MEM_BUFFER_SIZE (128 * MAX_MEMORY_EVENT)
+// Largest message header + appropriate storage for events and code
+#define MSG_BUFFER_SIZE (42 + 9*MAX_CODE_EVENT + MAX_CODE_SIZE)
+#define CODE_BUFFER_SIZE MAX_CODE_SIZE
+#define INFO_BUFFER_SIZE 32768
 #define MAX_THREAD 2048
 #define MAX_FILTER 64
 
@@ -54,14 +61,14 @@ static int filter_number = 0;
 
 static int memory_events_idx = 0;
 static int memory_buffer_idx = 0;
-static uint8_t memory_buffer[BUFFER_SIZE];
-static uint8_t msg_buffer[BUFFER_SIZE];
+static uint8_t memory_buffer[MEM_BUFFER_SIZE];
+static uint8_t msg_buffer[MSG_BUFFER_SIZE];
 static MemoryMsg memory_events[MAX_MEMORY_EVENT];
 static int code_buffer_idx = 0;
 static int code_event_idx = 0;
 static uint64_t address_buffer[MAX_CODE_EVENT];
 static uint8_t length_buffer[MAX_CODE_EVENT];
-static uint8_t code_buffer[BUFFER_SIZE];
+static uint8_t code_buffer[CODE_BUFFER_SIZE];
 static uint32_t thread_counter = 0;
 static uint64_t thread_ids[MAX_THREAD];
 
@@ -170,7 +177,7 @@ static void flushCodeEvents()
 static VG_REGPARM(3) void instructionCallback(Addr addr, UChar delta, SizeT length)
 {
     if(code_event_idx >= MAX_CODE_EVENT ||
-       code_buffer_idx + length >= BUFFER_SIZE ||
+       code_buffer_idx + length >= CODE_BUFFER_SIZE ||
        (code_event_idx > 0 &&
        address_buffer[code_event_idx-1]+length_buffer[code_event_idx-1] != addr+delta))
         flushCodeEvents();
@@ -221,7 +228,7 @@ static void threadStartedCallback(ThreadId tid, ULong block_dispatched)
 static VG_REGPARM(3) void readCallback(Addr ins_addr, Addr start_addr, SizeT length)
 {
     if(memory_events_idx>=MAX_MEMORY_EVENT ||
-       memory_buffer_idx+length>=BUFFER_SIZE)
+       memory_buffer_idx + length >= MEM_BUFFER_SIZE)
         flushMemoryEvents();
     MemoryMsg *msg = &(memory_events[memory_events_idx]);
     msg->exec_id = exec_id;
@@ -238,7 +245,7 @@ static VG_REGPARM(3) void readCallback(Addr ins_addr, Addr start_addr, SizeT len
 static VG_REGPARM(3) void writeCallback(Addr ins_addr, Addr start_addr, SizeT length)
 {
     if(memory_events_idx>=MAX_MEMORY_EVENT ||
-       memory_buffer_idx+length>=BUFFER_SIZE)
+       memory_buffer_idx + length >= MEM_BUFFER_SIZE)
         flushMemoryEvents();
     MemoryMsg *msg = &(memory_events[memory_events_idx]);
     msg->exec_id = exec_id;
@@ -322,7 +329,7 @@ static void tg_post_clo_init(void)
     VexArch vex_arch;
     VexArchInfo vex_arch_info;
     InfoMsg msg;
-    char* buffer[BUFFER_SIZE];
+    char* buffer[INFO_BUFFER_SIZE];
     char *start, *end;
     int i;
 
@@ -360,8 +367,8 @@ static void tg_post_clo_init(void)
     for(i = 0; i < VG_(sizeXA)(VG_(args_for_client)); i++)
     {
         if(i != 0)
-            VG_(strncat)(buffer, " ", BUFFER_SIZE);
-        VG_(strncat)(buffer, *(HChar**)VG_(indexXA)(VG_(args_for_client), i), BUFFER_SIZE);
+            VG_(strncat)(buffer, " ", INFO_BUFFER_SIZE);
+        VG_(strncat)(buffer, *(HChar**)VG_(indexXA)(VG_(args_for_client), i), INFO_BUFFER_SIZE);
     }
     msg.value = buffer;
     sendInfoMsg(trace_output_fd, &msg);
