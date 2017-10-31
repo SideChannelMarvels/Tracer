@@ -46,6 +46,9 @@ public:
     ~MainWindow();   
     void openFile(const char* filename);
 
+protected:
+    virtual void resizeEvent(QResizeEvent* event);
+
 private slots:
 
     void on_actionMetadata_triggered();
