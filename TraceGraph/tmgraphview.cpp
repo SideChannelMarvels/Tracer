@@ -101,6 +101,8 @@ void TMGraphView::onDBProcessingFinished()
 {
     trace_state = TRACE_READY;
     regionProcessing();
+    // Automatically show full view upon loading a DB
+    zoomToOverview();
     update();
 }
 
@@ -257,10 +259,8 @@ void TMGraphView::setTime(unsigned long long time)
     update();
 }
 
-void TMGraphView::zoomToOverview()
+void TMGraphView::updateZoomFactors()
 {
-    view_address = 0;
-    view_time = 0;
     if(total_bytes != 0) {
         address_zoom_factor = width()/(double)total_bytes;
     }
@@ -273,6 +273,28 @@ void TMGraphView::zoomToOverview()
     else {
         time_zoom_factor = 1.0;
     }
+}
+
+void TMGraphView::zoomToOverview()
+{
+    view_address = 0;
+    view_time = 0;
+
+    updateZoomFactors();
+
+    emit positionChange(displayAddressToRealAddress(view_address), view_time);
+    update();
+}
+
+void TMGraphView::onWindowResize()
+{
+    // Special behaviour if overview: fit to new window size
+    if (view_address == 0 && view_time == 0)
+    {
+        updateZoomFactors();
+    }
+    // Otherwise, repaint at the same zoom level, thus showing more stuff if you increase window size, less stuff if you decrease it
+
     emit positionChange(displayAddressToRealAddress(view_address), view_time);
     update();
 }

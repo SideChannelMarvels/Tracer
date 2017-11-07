@@ -87,6 +87,7 @@ public slots:
     void onEventReceived(Event ev);
     void onConnectedToDatabase();
     void onDBProcessingFinished();
+    void onWindowResize();
 
 private:
     QBrush rbrush, wbrush, rwbrush, ibrush;
@@ -108,6 +109,7 @@ private:
     unsigned long long realAddressToDisplayAddress(unsigned long long address);
     unsigned long long displayAddressToRealAddress(unsigned long long address);
     Event findEventAt(const QPoint pos);
+    void updateZoomFactors();
 
 protected:
     void wheelEvent(QWheelEvent *event);

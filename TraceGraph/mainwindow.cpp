@@ -75,6 +75,13 @@ void MainWindow::onInvalidDatabase()
     error.exec();
 }
 
+void MainWindow::resizeEvent(QResizeEvent* event)
+{
+    QMainWindow::resizeEvent(event);
+    // Update UI
+    ui->graph->onWindowResize();
+}
+
 void MainWindow::positionChanged(unsigned long long address, unsigned long long time)
 {
     char buffer[64];
