@@ -140,6 +140,10 @@ int main(int argc, char **argv)
                     mode =| CS_MODE_BIG_ENDIAN;
 #endif
                 } 
+                else if(strcmp(value, "MIPS32") == 0){
+                    arch = CS_ARCH_MIPS;
+                    mode = CS_MODE_MIPS32;
+                }
                 cs_open(arch, mode, &capstone_handle);
             }
             sqlite3_reset(info_insert);
