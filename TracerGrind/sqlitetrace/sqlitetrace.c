@@ -29,7 +29,7 @@
 #include <sqlite3.h>
 #include "../tracergrind/trace_protocol.h"
 
-#define BUFFER_SIZE 1024
+#define BUFFER_SIZE 2048
 
 static const char *SETUP_QUERY = 
 "CREATE TABLE IF NOT EXISTS info (key TEXT PRIMARY KEY, value TEXT);\n"
@@ -107,9 +107,9 @@ int main(int argc, char **argv)
         fread((void*)&(msg.length), 8, 1, trace);
         if(msg.type == MSG_INFO)
         {
-            char key[128], value[128];
+            char key[128], value[BUFFER_SIZE];
             fget_cstr(key, 128, trace);
-            fget_cstr(value, 128, trace);
+            fget_cstr(value, BUFFER_SIZE, trace);
             if(strcmp(key, "ARCH") == 0)
             {
                 if(strcmp(value, "AMD64") == 0)
@@ -155,10 +155,10 @@ int main(int argc, char **argv)
         else if(msg.type == MSG_LIB)
         {
             LibMsg lmsg;
-            char name[128];
+            char name[BUFFER_SIZE];
             fread((void*)&(lmsg.base), 8, 1, trace);
             fread((void*)&(lmsg.end), 8, 1, trace);
-            fget_cstr(name, 128, trace);
+            fget_cstr(name, BUFFER_SIZE, trace);
             sqlite3_reset(lib_insert);
             sqlite3_bind_text(lib_insert, 1, name, -1, SQLITE_TRANSIENT);
             snprintf(buffer, BUFFER_SIZE, "0x%016llx", lmsg.base);
