@@ -54,10 +54,21 @@ static uint64_t exec_id = 0;
 
 static HChar* trace_output_filename;
 static HChar *filter_str;
-static HChar *filters[MAX_FILTER];
+static HChar *filters_instr[MAX_FILTER];
+static HChar *filter_mem_str;
+static HChar *filters_mem[MAX_FILTER];
+static HChar *filter_bblock_str;
+static HChar *filters_bblock[MAX_FILTER];
 static Int trace_output_fd = 0;
-static Addr filter_start[MAX_FILTER], filter_end[MAX_FILTER];
-static int filter_number = 0;
+static Addr filter_instr_start[MAX_FILTER], filter_instr_end[MAX_FILTER];
+static Addr filter_mem_start[MAX_FILTER], filter_mem_end[MAX_FILTER];
+static Int filter_bblock_start[MAX_FILTER], filter_bblock_end[MAX_FILTER];
+static int filter_instr_number = 0;
+static int filter_mem_number = 0;
+static int filter_bblock_number = 0;
+static int trace_instr = 1;
+static int trace_mem_read = 1;
+static int trace_mem_write = 1;
 
 static int memory_events_idx = 0;
 static int memory_buffer_idx = 0;
@@ -73,6 +84,28 @@ static uint32_t thread_counter = 0;
 static uint64_t thread_ids[MAX_THREAD];
 
 // ---- Trace file format helper functions ----
+Bool traceBblock(Int i)
+{
+    Int        j;
+    Bool trace_bblock = False;
+
+    if(filter_bblock_number == 0)
+    {
+        trace_bblock = True;
+    }
+    else
+    {
+        for(j = 0; j < filter_bblock_number; j++)
+        {
+            if(filter_bblock_start[j] <= i && filter_bblock_end[j] >= i)
+            {
+                trace_bblock = True;
+            }
+        }
+    }
+
+    return trace_bblock;
+}
 
 void sendInfoMsg(UInt fd, InfoMsg *info_msg)
 {
@@ -102,35 +135,44 @@ void sendLibMsg(UInt fd, LibMsg *lib_msg)
 
 void sendExecMsg(UInt fd, ExecMsg *exec_msg)
 {
-    uint8_t type = MSG_EXEC;
-    uint64_t length = 41; // msg header
-    length += 9*exec_msg->number + exec_msg->length;
-    VG_(memcpy)((void*)msg_buffer, &type, 1);
-    VG_(memcpy)((void*)&(msg_buffer[1]), &length, 8);
-    VG_(memcpy)((void*)&(msg_buffer[9]), &(exec_msg->exec_id), 8);
-    VG_(memcpy)((void*)&(msg_buffer[17]), &(exec_msg->thread_id), 8);
-    VG_(memcpy)((void*)&(msg_buffer[25]), &(exec_msg->number), 8);
-    VG_(memcpy)((void*)&(msg_buffer[33]), &(exec_msg->length), 8);
-    VG_(memcpy)((void*)&(msg_buffer[41]), (void*)exec_msg->addresses, 8*exec_msg->number);
-    VG_(memcpy)((void*)&(msg_buffer[41+8*exec_msg->number]), (void*)exec_msg->lengths, exec_msg->number);
-    VG_(memcpy)((void*)&(msg_buffer[41+9*exec_msg->number]), (void*)exec_msg->code, exec_msg->length);
-    VG_(write)(fd, msg_buffer, length);
+    if (traceBblock(exec_msg->exec_id) && trace_instr)
+    {
+        uint8_t type = MSG_EXEC;
+        uint64_t length = 41; // msg header
+        length += 9*exec_msg->number + exec_msg->length;
+        VG_(memcpy)((void*)msg_buffer, &type, 1);
+        VG_(memcpy)((void*)&(msg_buffer[1]), &length, 8);
+        VG_(memcpy)((void*)&(msg_buffer[9]), &(exec_msg->exec_id), 8);
+        VG_(memcpy)((void*)&(msg_buffer[17]), &(exec_msg->thread_id), 8);
+        VG_(memcpy)((void*)&(msg_buffer[25]), &(exec_msg->number), 8);
+        VG_(memcpy)((void*)&(msg_buffer[33]), &(exec_msg->length), 8);
+        VG_(memcpy)((void*)&(msg_buffer[41]), (void*)exec_msg->addresses, 8*exec_msg->number);
+        VG_(memcpy)((void*)&(msg_buffer[41+8*exec_msg->number]), (void*)exec_msg->lengths, exec_msg->number);
+        VG_(memcpy)((void*)&(msg_buffer[41+9*exec_msg->number]), (void*)exec_msg->code, exec_msg->length);
+        VG_(write)(fd, msg_buffer, length);
+    }
 }
 
 void sendMemoryMsg(UInt fd, MemoryMsg *memory_msg)
 {
-    uint8_t type = MSG_MEMORY;
-    uint64_t length = 42; // msg header
-    length += memory_msg->length;
-    VG_(memcpy)((void*)msg_buffer, &type, 1);
-    VG_(memcpy)((void*)&(msg_buffer[1]), &length, 8);
-    VG_(memcpy)((void*)&(msg_buffer[9]), &(memory_msg->exec_id), 8);
-    VG_(memcpy)((void*)&(msg_buffer[17]), &(memory_msg->ins_address), 8);
-    VG_(memcpy)((void*)&(msg_buffer[25]), &(memory_msg->mode), 1);
-    VG_(memcpy)((void*)&(msg_buffer[26]), &(memory_msg->start_address), 8);
-    VG_(memcpy)((void*)&(msg_buffer[34]), &(memory_msg->length), 8);
-    VG_(memcpy)((void*)&(msg_buffer[42]), memory_msg->data, length-42);
-    VG_(write)(fd, msg_buffer, length);
+    if ((trace_mem_read && (memory_msg->mode == MODE_READ)) || (trace_mem_write && (memory_msg->mode == MODE_WRITE)))
+    {
+        if (traceBblock(memory_msg->exec_id))
+        {
+            uint8_t type = MSG_MEMORY;
+            uint64_t length = 42; // msg header
+            length += memory_msg->length;
+            VG_(memcpy)((void*)msg_buffer, &type, 1);
+            VG_(memcpy)((void*)&(msg_buffer[1]), &length, 8);
+            VG_(memcpy)((void*)&(msg_buffer[9]), &(memory_msg->exec_id), 8);
+            VG_(memcpy)((void*)&(msg_buffer[17]), &(memory_msg->ins_address), 8);
+            VG_(memcpy)((void*)&(msg_buffer[25]), &(memory_msg->mode), 1);
+            VG_(memcpy)((void*)&(msg_buffer[26]), &(memory_msg->start_address), 8);
+            VG_(memcpy)((void*)&(msg_buffer[34]), &(memory_msg->length), 8);
+            VG_(memcpy)((void*)&(msg_buffer[42]), memory_msg->data, length-42);
+            VG_(write)(fd, msg_buffer, length);
+        }
+    }
 }
 
 void sendThreadMsg(UInt fd, ThreadMsg *thread_msg)
@@ -225,21 +267,47 @@ static void threadStartedCallback(ThreadId tid, ULong block_dispatched)
         thread_id = tid;
 }
 
+Bool traceMem(Addr a)
+{
+    Int        j;
+    Bool trace_mem = False;
+
+    if(filter_mem_number == 0)
+    {
+        trace_mem = True;
+    }
+    else
+    {
+        for(j = 0; j < filter_mem_number; j++)
+        {
+            if(filter_mem_start[j] <= a && filter_mem_end[j] >= a)
+            {
+                trace_mem = True;
+            }
+        }
+    }
+
+    return trace_mem;
+}
+
 static VG_REGPARM(3) void readCallback(Addr ins_addr, Addr start_addr, SizeT length)
 {
     if(memory_events_idx>=MAX_MEMORY_EVENT ||
        memory_buffer_idx + length >= MEM_BUFFER_SIZE)
         flushMemoryEvents();
-    MemoryMsg *msg = &(memory_events[memory_events_idx]);
-    msg->exec_id = exec_id;
-    msg->ins_address = ins_addr;
-    msg->mode = MODE_READ;
-    msg->start_address = start_addr;
-    msg->length = length;
-    msg->data = &(memory_buffer[memory_buffer_idx]);
-    VG_(memcpy)((void*)&(memory_buffer[memory_buffer_idx]), (void*)start_addr, length);
-    memory_events_idx++;
-    memory_buffer_idx += length;
+    if (traceMem(start_addr))
+    {
+        MemoryMsg *msg = &(memory_events[memory_events_idx]);
+        msg->exec_id = exec_id;
+        msg->ins_address = ins_addr;
+        msg->mode = MODE_READ;
+        msg->start_address = start_addr;
+        msg->length = length;
+        msg->data = &(memory_buffer[memory_buffer_idx]);
+        VG_(memcpy)((void*)&(memory_buffer[memory_buffer_idx]), (void*)start_addr, length);
+        memory_events_idx++;
+        memory_buffer_idx += length;
+    }
 }
 
 static VG_REGPARM(3) void writeCallback(Addr ins_addr, Addr start_addr, SizeT length)
@@ -247,16 +315,19 @@ static VG_REGPARM(3) void writeCallback(Addr ins_addr, Addr start_addr, SizeT le
     if(memory_events_idx>=MAX_MEMORY_EVENT ||
        memory_buffer_idx + length >= MEM_BUFFER_SIZE)
         flushMemoryEvents();
-    MemoryMsg *msg = &(memory_events[memory_events_idx]);
-    msg->exec_id = exec_id;
-    msg->ins_address = ins_addr;
-    msg->mode = MODE_WRITE;
-    msg->start_address = start_addr;
-    msg->length = length;
-    msg->data = &(memory_buffer[memory_buffer_idx]);
-    VG_(memcpy)((void*)&(memory_buffer[memory_buffer_idx]), (void*)start_addr, length);
-    memory_events_idx++;
-    memory_buffer_idx += length;
+    if (traceMem(start_addr))
+    {
+        MemoryMsg *msg = &(memory_events[memory_events_idx]);
+        msg->exec_id = exec_id;
+        msg->ins_address = ins_addr;
+        msg->mode = MODE_WRITE;
+        msg->start_address = start_addr;
+        msg->length = length;
+        msg->data = &(memory_buffer[memory_buffer_idx]);
+        VG_(memcpy)((void*)&(memory_buffer[memory_buffer_idx]), (void*)start_addr, length);
+        memory_events_idx++;
+        memory_buffer_idx += length;
+    }
 }
 
 void trackMemCallback(Addr a, SizeT len, Bool rr, Bool ww, Bool xx, ULong di_handle)
@@ -267,18 +338,18 @@ void trackMemCallback(Addr a, SizeT len, Bool rr, Bool ww, Bool xx, ULong di_han
     {
         char *filename = VG_(DebugInfo_get_filename)(di);
         char *soname = VG_(DebugInfo_get_soname)(di);
-        for(i = 0; i < filter_number; i++)
+        for(i = 0; i < filter_instr_number; i++)
         {
-            if(filters[i] != NULL &&
-               ((filename != NULL && VG_(strcmp)(filters[i], filename) == 0) ||
-               (soname != NULL && VG_(strcmp)(filters[i], soname) == 0)))
+            if(filters_instr[i] != NULL &&
+               ((filename != NULL && VG_(strcmp)(filters_instr[i], filename) == 0) ||
+               (soname != NULL && VG_(strcmp)(filters_instr[i], soname) == 0)))
             {
-                filter_start[i] = VG_(DebugInfo_get_text_avma)(di);
-                filter_end[i] = filter_start[i] + VG_(DebugInfo_get_text_size)(di);
+                filter_instr_start[i] = VG_(DebugInfo_get_text_avma)(di);
+                filter_instr_end[i] = filter_instr_start[i] + VG_(DebugInfo_get_text_size)(di);
                 if (VG_(clo_verbosity) > 0)
-                    VG_(umsg)("Filtering %s from 0x%016llx to 0x%016llx\n", filters[i],
-                            (Addr64) filter_start[i], (Addr64) filter_end[i]);
-                filters[i] = NULL;
+                    VG_(umsg)("Filtering %s from 0x%016llx to 0x%016llx\n", filters_instr[i],
+                            (Addr64) filter_instr_start[i], (Addr64) filter_instr_end[i]);
+                filters_instr[i] = NULL;
             }
         }
     }
@@ -291,7 +362,12 @@ static void tg_print_usage(void)
 {  
     VG_(printf)(
         "    --output=<name>           trace output file name\n"
-        "    --filter=<list>           list of comma separated address ranges or binaries to filter\n"
+        "    --filter=<list>           list of comma separated instruction address ranges or binaries to filter (hex, eg 0x1000-0x2000)\n"
+        "    --filter-mem=<list>       list of comma separated memory address ranges to filter (hex, eg 0x1000-0x2000)\n"
+        "    --filter-bblock=<list>    list of comma separated basic block ranges to filter (dec, eg 1000-2000)\n"
+        "    --trace-instr=<yes|no>    trace instructions (default = yes, required for sqlitetrace/tracegraph)\n"
+        "    --trace-memread=<yes|no>  trace memory reads (default = yes)\n"
+        "    --trace-memwrite=<yes|no> trace memory writes (default = yes)\n"
     );
 }
 
@@ -301,16 +377,42 @@ static Bool tg_process_cmd_line_option(const HChar* arg)
     else if VG_STR_CLO(arg, "--filter", filter_str)
     {
         int i;
-        filters[0] = VG_(strtok)(filter_str, ",");
+        filters_instr[0] = VG_(strtok)(filter_str, ",");
         for(i = 1; i<MAX_FILTER; i++)
         {
-            filters[i] = VG_(strtok)(NULL, ",");
-            if(filters[i] == NULL)
+            filters_instr[i] = VG_(strtok)(NULL, ",");
+            if(filters_instr[i] == NULL)
                 break;
         }
-        filter_number = i;
-        
+        filter_instr_number = i;
     }
+    else if VG_STR_CLO(arg, "--filter-mem", filter_mem_str)
+    {
+        int i;
+        filters_mem[0] = VG_(strtok)(filter_mem_str, ",");
+        for(i = 1; i<MAX_FILTER; i++)
+        {
+            filters_mem[i] = VG_(strtok)(NULL, ",");
+            if(filters_mem[i] == NULL)
+                break;
+        }
+        filter_mem_number = i;
+    }
+    else if VG_STR_CLO(arg, "--filter-bblock", filter_bblock_str)
+    {
+        int i;
+        filters_bblock[0] = VG_(strtok)(filter_bblock_str, ",");
+        for(i = 1; i<MAX_FILTER; i++)
+        {
+            filters_bblock[i] = VG_(strtok)(NULL, ",");
+            if(filters_bblock[i] == NULL)
+                break;
+        }
+        filter_bblock_number = i;
+    }
+    else if VG_BOOL_CLO(arg, "--trace-instr", trace_instr) {}
+    else if VG_BOOL_CLO(arg, "--trace-memread", trace_mem_read) {}
+    else if VG_BOOL_CLO(arg, "--trace-memwrite", trace_mem_write) {}
     else
         return False;
     return True;
@@ -372,18 +474,45 @@ static void tg_post_clo_init(void)
     }
     msg.value = buffer;
     sendInfoMsg(trace_output_fd, &msg);
-    for(i = 0; i < filter_number; i++)
+    for(i = 0; i < filter_instr_number; i++)
     {
-        start = VG_(strstr)(filters[i], "0x");
-        end = VG_(strstr)(filters[i],"-0x");
+        start = VG_(strstr)(filters_instr[i], "0x");
+        end = VG_(strstr)(filters_instr[i],"-0x");
         if(start != NULL && end != NULL)
         {
-            filter_start[i] = VG_(strtoull16)(&(start[2]), NULL);
-            filter_end[i] = VG_(strtoull16)(&(end[3]), NULL);
+            filter_instr_start[i] = VG_(strtoull16)(&(start[2]), NULL);
+            filter_instr_end[i] = VG_(strtoull16)(&(end[3]), NULL);
             if (VG_(clo_verbosity) > 0)
-                VG_(umsg)("Filtering address range from 0x%016llx to 0x%016llx\n",
-                        (Addr64) filter_start[i], (Addr64) filter_end[i]);
-            filters[i] = NULL;
+                VG_(umsg)("Filtering instruction address range from 0x%016llx to 0x%016llx\n",
+                        (Addr64) filter_instr_start[i], (Addr64) filter_instr_end[i]);
+            filters_instr[i] = NULL;
+        }
+    }
+    for(i = 0; i < filter_mem_number; i++)
+    {
+        start = VG_(strstr)(filters_mem[i], "0x");
+        end = VG_(strstr)(filters_mem[i],"-0x");
+        if(start != NULL && end != NULL)
+        {
+            filter_mem_start[i] = VG_(strtoull16)(&(start[2]), NULL);
+            filter_mem_end[i] = VG_(strtoull16)(&(end[3]), NULL);
+            if (VG_(clo_verbosity) > 0)
+                VG_(umsg)("Filtering memory address range from 0x%016llx to 0x%016llx\n",
+                        (Addr64) filter_mem_start[i], (Addr64) filter_mem_end[i]);
+            filters_mem[i] = NULL;
+        }
+    }
+    for(i = 0; i < filter_bblock_number; i++)
+    {
+        end = VG_(strstr)(filters_bblock[i],"-");
+        if(end != NULL)
+        {
+            filter_bblock_start[i] = VG_(strtoull10)(filters_bblock[i], NULL);
+            filter_bblock_end[i] = VG_(strtoull10)(&(end[1]), NULL);
+            if (VG_(clo_verbosity) > 0)
+                VG_(umsg)("Filtering basic block range from %d to %d\n",
+                          filter_bblock_start[i], filter_bblock_end[i]);
+            filters_bblock[i] = NULL;
         }
     }
 }
@@ -400,7 +529,7 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
     IRSB*      sbOut;
     IRExpr **argv, *arg1, *arg2, *arg3;
     Addr64 last_addr;
-    Bool trace = False;
+    Bool trace_instr = False;
     if (gWordTy != hWordTy)
     {
         VG_(tool_panic)("host/guest word size mismatch");
@@ -416,17 +545,17 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
         addStmtToIRSB( sbOut, sbIn->stmts[i] );
         i++;
     }
-    if(filter_number == 0)
-        trace = True;
+    if(filter_instr_number == 0)
+        trace_instr = True;
     else
-        for(j = 0; j < filter_number; j++)
-            if(filter_start[j] <= sbIn->stmts[i]->Ist.IMark.addr &&
-               filter_end[j] >= sbIn->stmts[i]->Ist.IMark.addr)
-                trace = True;
+        for(j = 0; j < filter_instr_number; j++)
+            if(filter_instr_start[j] <= sbIn->stmts[i]->Ist.IMark.addr &&
+               filter_instr_end[j] >= sbIn->stmts[i]->Ist.IMark.addr)
+                trace_instr = True;
     for(; i < sbIn->stmts_used; i++)
     {
         IRStmt* st = sbIn->stmts[i];
-        if(trace == True)
+        if(trace_instr == True)
         {
             if(st->tag == Ist_IMark)
             {
@@ -504,7 +633,7 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
         }
         // First executing the instruction then checking what was written
         addStmtToIRSB(sbOut, st);
-        if(trace == True)
+        if(trace_instr == True)
         {
             if(st->tag == Ist_StoreG)
             {
