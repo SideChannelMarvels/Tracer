@@ -27,6 +27,8 @@
 #include <capstone/capstone.h>
 #include "../tracergrind/trace_protocol.h"
 
+#define BUFFER_SIZE 2048
+
 int fget_cstr(char *buffer, int size, FILE *file)
 {
     int i;
@@ -74,9 +76,9 @@ int main(int argc, char **argv)
         fread((void*)&(msg.length), 8, 1, trace);
         if(msg.type == MSG_INFO)
         {
-            char key[128], value[128];
+            char key[128], value[BUFFER_SIZE];
             fget_cstr(key, 128, trace);
-            fget_cstr(value, 128, trace);
+            fget_cstr(value, BUFFER_SIZE, trace);
             if(strcmp(key, "ARCH") == 0)
             {
                 if(strcmp(value, "AMD64") == 0)
@@ -118,10 +120,10 @@ int main(int argc, char **argv)
         else if(msg.type == MSG_LIB)
         {
             LibMsg lmsg;
-            char name[128];
+            char name[BUFFER_SIZE];
             fread((void*)&(lmsg.base), 8, 1, trace);
             fread((void*)&(lmsg.end), 8, 1, trace);
-            fget_cstr(name, 128, trace);
+            fget_cstr(name, BUFFER_SIZE, trace);
             fprintf(texttrace, "[L] Loaded %s from 0x%016llx to 0x%016llx\n",
                     name, lmsg.base, lmsg.end);
         }
