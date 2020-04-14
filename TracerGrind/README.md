@@ -26,8 +26,13 @@ sudo apt-get install --yes --no-install-recommends gcc-multilib
 
 The plugin sources have to be copied 
 inside Valgrind tree and a few configuration files have to be modified. Those modifications are 
-described in patch files provided for Valgrind 3.12.0, Valgrind 3.11.0 and Valgrind 3.10.1. Below 
-are the full list of commands required to compile it. You can use a different installation prefix 
+described in patch files provided for various Valgrind versions
+3.10.1,
+3.11.0,
+3.12.0,
+3.13.0,
+3.15.0.
+Below are the full list of commands required to compile it. You can use a different installation prefix 
 than /usr (which would overwrite a distribution installation of Valgrind), the default being 
 /usr/local.
 
