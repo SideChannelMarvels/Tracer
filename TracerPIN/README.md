@@ -24,11 +24,11 @@ sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i
 Then for Intel PIN, make sure the user has r/w access to the PIN installation and to ease the next steps define PIN_ROOT:
 
 ```bash
-wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-2.14-71313-gcc.4.4.7-linux.tar.gz
-tar xzf pin-2.14-71313-gcc.4.4.7-linux.tar.gz
-mv pin-2.14-71313-gcc.4.4.7-linux /opt
-export PIN_ROOT=/opt/pin-2.14-71313-gcc.4.4.7-linux
-echo -e "\nexport PIN_ROOT=/opt/pin-2.14-71313-gcc.4.4.7-linux" >> ~/.bashrc
+wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-3.15-98253-gb56e429b1-gcc-linux.tar.gz
+tar xzf pin-3.15-98253-gb56e429b1-gcc-linux.tar.gz
+mv pin-3.15-98253-gb56e429b1-gcc-linux /opt
+export PIN_ROOT=/opt/pin-3.15-98253-gb56e429b1-gcc-linux
+echo -e "\nexport PIN_ROOT=/opt/pin-3.15-98253-gb56e429b1-gcc-linux" >> ~/.bashrc
 ```
 
 Now you're ready to compile TracerPIN and install it.
@@ -36,16 +36,6 @@ Now you're ready to compile TracerPIN and install it.
 ```bash
 make
 sudo make install
-```
-
-If your default gcc is too recent for PIN, you'll get an error such as:
-
-`error: #error The C++ ABI of your compiler does not match the ABI of the pin kit.`
-
-You can tell make to use an older one (provided that you installed it), e.g.:
-
-```bash
-make CXX=g++-4.9
 ```
 
 Usage
@@ -125,13 +115,6 @@ By default are logged:
 It's possible to disable any of them and it's possible to enable an experimental tracing of the
 function calls with their arguments, or at least what Intel PIN can find about them.
 Run the tool without arguments to get help about those options.
-
-### Self-modifying code
-
-It's possible to modify the instruction cache size to cope with some self-modifying code, at the cost
-of efficiency, so use it seldomly.
-
-Cf option `-cache n` to limit caching to n instructions and option `-smc_strict 1`.
 
 Troubleshooting
 ---------------

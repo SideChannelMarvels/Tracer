@@ -1,10 +1,11 @@
 /* ===================================================================== */
 /* TracerPIN is an execution tracing module for Intel PIN tools          */
-/* Copyright (C) 2016                                                    */
+/* Copyright (C) 2020                                                    */
 /* Original author:   Phil Teuwen <phil@teuwen.org>                      */
 /* Contributors:      Charles Hubain <me@haxelion.eu>                    */
 /*                    Joppe Bos <joppe_bos@hotmail.com>                  */
 /*                    Wil Michiels <w.p.a.j.michiels@tue.nl>             */
+/*                    Keegan Saunders <keegan@sdf.org>                   */
 /*                                                                       */
 /* This program is free software: you can redistribute it and/or modify  */
 /* it under the terms of the GNU General Public License as published by  */
@@ -26,8 +27,11 @@
 #include <cstdlib>
 #include <iomanip>
 #include <map>
-#include <sqlite3.h>
+#include "sqlite3.h"
 #include <sys/time.h>
+#include <sys/syscall.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 #ifndef GIT_DESC
 #define GIT_DESC "(unknown version)"
 #endif //GIT_DESC
@@ -106,12 +110,54 @@ KNOB<string> KnobLogFilterLive(KNOB_MODE_WRITEONCE, "pintool",
                         "F", "0", "(0) no live filter (0x400000:0x410000) use addresses as start:stop live filter");
 KNOB<INT> KnobLogFilterLiveN(KNOB_MODE_WRITEONCE, "pintool",
                            "n", "0", "which occurence to log, 0=all (only for -F start:stop filter)");
-KNOB<INT> KnobCacheIns(KNOB_MODE_WRITEONCE, "pintool",
-                        "cache", "0", "(0) default cache size (n) Limit caching to n instructions per trace, useful for SMC (see also -smc_strict 1)");
 KNOB<string> KnobLogType(KNOB_MODE_WRITEONCE, "pintool",
                          "t", "human", "log type: human/sqlite");
 KNOB<BOOL> KnobQuiet(KNOB_MODE_WRITEONCE, "pintool",
                        "q", "0", "be quiet under normal conditions");
+
+/* ============================================================================= */
+/* Intel PIN (3.7) is missing implementations of many C functions, we implement  */
+/* them here. THESE ARE NOT UNIVERSALLY COMPATIBLE, DO NOT USE OUTSIDE TracerPIN */
+/* ============================================================================= */
+
+extern "C" int stat(const char *name, struct stat *buf)
+{
+	return syscall(SYS_stat, name, buf);
+}
+
+extern "C" int fchmod(int fd, mode_t mode)
+{
+	return syscall(SYS_fchmod, fd, mode);
+}
+
+extern "C" int fchown(int fd, uid_t uid, gid_t gid)
+{
+	return syscall(SYS_fchown, fd, uid, gid);
+}
+
+extern "C" uid_t geteuid(void)
+{
+	return syscall(SYS_geteuid);
+}
+
+extern "C" int fstat(int fd, struct stat *st)
+{
+    if (fd < 0)
+    {
+        return -EBADF;
+    }
+    return syscall(SYS_fstat, fd, st);
+}
+
+extern "C" int lstat(const char * path, struct stat * buf)
+{
+    return syscall(SYS_lstat, path, buf);
+}
+
+extern "C" int utimes(const char *path, const struct timeval times[2])
+{
+    return syscall(SYS_utimes, path, times);
+}
 
 /* ===================================================================== */
 /* Print Help Message                                                    */
@@ -459,7 +505,7 @@ VOID Instruction_cb(INS ins, VOID *v)
                     IARG_INST_PTR,
                     IARG_END);
             }
-            if (INS_IsBranchOrCall(ins))
+            if (INS_IsControlFlow(ins))
             {
                 INS_InsertCall(
                     ins, IPOINT_TAKEN_BRANCH, (AFUNPTR)RecordMemWrite,
@@ -608,18 +654,11 @@ void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
     string nameArg1 = "";
     string nameArg2 = "";
 
-    try
-    {
-        nameFunc = RTN_FindNameByAddress(ip);
-        if (KnobLogCallArgs.Value()) {
-            nameArg0 = RTN_FindNameByAddress(arg0);
-            nameArg1 = RTN_FindNameByAddress(arg1);
-            nameArg2 = RTN_FindNameByAddress(arg2);
-        }
-    }
-    catch (int e)
-    {
-        cerr << "[!] Exception when trying to recover call args: " << e << endl;
+    nameFunc = RTN_FindNameByAddress(ip);
+    if (KnobLogCallArgs.Value()) {
+        nameArg0 = RTN_FindNameByAddress(arg0);
+        nameArg1 = RTN_FindNameByAddress(arg1);
+        nameArg2 = RTN_FindNameByAddress(arg2);
     }
 
     PIN_GetLock(&lock, ip);
@@ -686,9 +725,9 @@ void Trace_cb(TRACE trace, void *v)
 
             if(INS_IsCall(tail))
             {
-                if(INS_IsDirectBranchOrCall(tail))
+                if(INS_IsDirectControlFlow(tail))
                 {
-                    const ADDRINT target = INS_DirectBranchOrCallTargetAddress(tail);
+                    const ADDRINT target = INS_DirectControlFlowTargetAddress(tail);
 
                     INS_InsertPredicatedCall(
                         tail,
@@ -901,14 +940,6 @@ int  main(int argc, char *argv[])
         }
     }
     filter_live_n = KnobLogFilterLiveN.Value();
-
-    // Against very local self-modifying code, you can aggressively invalidate cache by making it small:
-    if (KnobCacheIns.Value()) {
-        if (CODECACHE_ChangeMaxInsPerTrace(KnobCacheIns.Value()))
-            cerr << "Cache size changed to " << KnobCacheIns.Value() << " instructions" << endl;
-        else
-            cerr << "FAILED changing cache size to " << KnobCacheIns.Value() << " instructions" << endl;
-    }
 
     TraceName = KnobOutputFile.Value();
 

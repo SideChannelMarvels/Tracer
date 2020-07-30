@@ -10,22 +10,26 @@ endif
 
 TOOL_CXXFLAGS+=-DGIT_DESC=\"$(GIT_DESC)\"
 
-TOOL_LIBS+=-lsqlite3
-
 PREFIX=/usr/local
 
 all: ia32 intel64
 
+$(OBJDIR)sqlite3$(OBJ_SUFFIX): sqlite3.c sqlite3.h
+	$(CC) $(TOOL_CFLAGS) -DSQLITE_THREADSAFE=0 -Wno-return-local-addr $(COMP_OBJ)$@ $<
+
+$(OBJDIR)Tracer.so: $(OBJDIR)Tracer$(OBJ_SUFFIX) $(OBJDIR)sqlite3$(OBJ_SUFFIX)
+	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
+
 ia32:
 	mkdir -p obj-ia32
-	$(MAKE) TARGET=ia32    obj-ia32/Tracer.so
+	$(MAKE) TARGET=ia32 obj-ia32/Tracer.so
 
 intel64:
 	mkdir -p obj-intel64
 	$(MAKE) TARGET=intel64 obj-intel64/Tracer.so
 
 clean-all:
-	$(MAKE) TARGET=ia32    clean
+	$(MAKE) TARGET=ia32 clean
 	$(MAKE) TARGET=intel64 clean
 
 install:
