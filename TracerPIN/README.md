@@ -14,11 +14,11 @@ For example on a Debian Jessie one would do:
 
 ```bash
 sudo apt-get install --no-install-recommends wget make g++
-sudo apt-get install --no-install-recommends libstdc++-4.9-dev libssl-dev libsqlite3-dev
+sudo apt-get install --no-install-recommends libstdc++-4.9-dev libssl-dev
 sudo dpkg --add-architecture i386
 sudo apt-get update
 sudo apt-get install --no-install-recommends gcc-multilib g++-multilib
-sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i386 libsqlite3-dev:i386
+sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i386
 ```
 
 Then for Intel PIN, make sure the user has r/w access to the PIN installation and to ease the next steps define PIN_ROOT:
