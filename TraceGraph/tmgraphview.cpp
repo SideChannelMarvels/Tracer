@@ -50,12 +50,15 @@ TMGraphView::TMGraphView(QWidget *parent) :
     wbrush.setColor(Qt::red);
     wbrush.setStyle(Qt::SolidPattern);
     wpen.setColor(Qt::red);
-    rwbrush.setColor(Qt::blue);
+    rwbrush.setColor(Qt::yellow);
     rwbrush.setStyle(Qt::SolidPattern);
-    rwpen.setColor(Qt::blue);
+    rwpen.setColor(Qt::yellow);
     ibrush.setColor(Qt::black);
     ibrush.setStyle(Qt::SolidPattern);
     ipen.setColor(Qt::black);
+    ptrbrush.setColor(Qt::blue);
+    ptrbrush.setStyle(Qt::SolidPattern);
+    ptrpen.setColor(Qt::blue);
     view_address = 0;
     view_time = 0;
     total_time = 0;
@@ -71,6 +74,10 @@ TMGraphView::TMGraphView(QWidget *parent) :
     setFocusPolicy(Qt::StrongFocus);
     drag_last_pos.setX(0);
     drag_last_pos.setY(0);
+    display_ptr_event = false;
+    draw_ptr_event = false;
+    ptr_event.type = EVENT_PTR;
+    ptr_event.nbID = 0;
 }
 
 QSize TMGraphView::sizeHint() const
@@ -423,10 +430,17 @@ void TMGraphView::mouseMoveEvent(QMouseEvent * event)
 {
     if(event->buttons() & Qt::LeftButton)
     {
-        addressMove((long)((drag_last_pos.x()-event->pos().x())/address_zoom_factor));
-        drag_last_pos.setX(event->pos().x());
-        timeMove((long)((drag_last_pos.y()-event->pos().y())/time_zoom_factor));
-        drag_last_pos.setY(event->pos().y());
+        if (draw_ptr_event)
+        {
+            setPtrEvent(event);
+        }
+        else
+        {
+            addressMove((long)((drag_last_pos.x()-event->pos().x())/address_zoom_factor));
+            drag_last_pos.setX(event->pos().x());
+            timeMove((long)((drag_last_pos.y()-event->pos().y())/time_zoom_factor));
+            drag_last_pos.setY(event->pos().y());
+        }
         update();
     }
     emit cursorPositionChange(displayAddressToRealAddress(view_address + (long long)(event->pos().x()/address_zoom_factor)),
@@ -437,10 +451,25 @@ void TMGraphView::mousePressEvent(QMouseEvent * event)
 {
     if(event->button() == Qt::LeftButton)
     {
-        drag_start.setX(event->pos().x());
-        drag_last_pos.setX(drag_start.x());
-        drag_start.setY(event->pos().y());
-        drag_last_pos.setY(drag_start.y());
+
+        Qt::KeyboardModifiers mod = QGuiApplication::keyboardModifiers();
+        if(mod == Qt::ControlModifier)
+        {
+            draw_ptr_event = true;
+            display_ptr_event = true;
+            drag_start.setX(event->pos().x());
+            drag_start.setY(event->pos().y());
+            ptr_event.time = view_time + (event->pos().y() / time_zoom_factor);
+            setPtrEvent(event);
+        }
+        else
+        {
+            draw_ptr_event = false;
+            drag_start.setX(event->pos().x());
+            drag_last_pos.setX(drag_start.x());
+            drag_start.setY(event->pos().y());
+            drag_last_pos.setY(drag_start.y());
+        }
     }
     else if(event->button() == Qt::RightButton)
     {
@@ -457,11 +486,22 @@ void TMGraphView::mouseReleaseEvent(QMouseEvent * event)
 {
     if(event->button() == Qt::LeftButton)
     {
+        if (draw_ptr_event)
+        {
+            draw_ptr_event = false;
+            setPtrEvent(event);
+            emit eventDescriptionQueried(ptr_event); // Mongoclient "should" reply with the description
+            update();
+        }
         // User is trying to select an event
-        if(abs(drag_start.x() - event->pos().x()) < 10 || abs(drag_start.y() - event->pos().y()) < 10)
+        else if(abs(drag_start.x() - event->pos().x()) < 10 || abs(drag_start.y() - event->pos().y()) < 10)
         {
             Event ev = findEventAt(event->pos());
             emit eventDescriptionQueried(ev); // Mongoclient "should" reply with the description
+            if (display_ptr_event) {
+                display_ptr_event = false;
+                update();
+            }
         }
     }
     else if(event->button() == Qt::RightButton)
@@ -487,6 +527,48 @@ void TMGraphView::mouseReleaseEvent(QMouseEvent * event)
     }
 }
 
+void TMGraphView::setPtrEvent(QMouseEvent* event)
+{
+  const int max_size = 1024;
+  unsigned long long address = displayAddressToRealAddress(view_address + (event->pos().x() / address_zoom_factor));
+  unsigned long long start_address = displayAddressToRealAddress(view_address + (drag_start.x() / address_zoom_factor));
+
+  if (address < start_address)
+  {
+      if (start_address - address > max_size)
+      {
+          ptr_event.address = start_address - max_size;
+          ptr_event.size = max_size;
+      }
+      else
+      {
+          ptr_event.address = address;
+          ptr_event.size = start_address - address;
+      }
+      if (realAddressToDisplayAddress(ptr_event.address) == 0xffffffffffffffff)
+      {
+          ptr_event.size -= 0x1000 - (ptr_event.address & 0xfff);
+          ptr_event.address += 0x1000 - (ptr_event.address & 0xfff);
+      }
+  }
+  else
+  {
+      if (address - start_address > max_size)
+      {
+          ptr_event.address = start_address;
+          ptr_event.size = max_size;
+      }
+      else
+      {
+          ptr_event.address = start_address;
+          ptr_event.size = address - start_address;
+      }
+      if (realAddressToDisplayAddress(ptr_event.address + ptr_event.size) == 0xffffffffffffffff)
+      {
+          ptr_event.size -= (ptr_event.address + ptr_event.size) & 0xfff;
+      }
+  }
+}
 
 void TMGraphView::setColor(EVENT_TYPE type)
 {
@@ -510,6 +592,33 @@ void TMGraphView::setColor(EVENT_TYPE type)
         painter->setPen(ipen);
         painter->setBrush(ibrush);
     }
+    else if(type == EVENT_PTR)
+    {
+        painter->setPen(ptrpen);
+        painter->setBrush(ptrbrush);
+    }
+}
+
+void TMGraphView::paintOneEvent(const Event& event, unsigned long windows_addr_size) {
+    unsigned long long event_display_addr = realAddressToDisplayAddress(event.address);
+    unsigned int masked_size = 0;
+    if (event_display_addr + event.size < view_address) {
+        return; // this event isn't in the windows, continue with the next one
+    } else if (event_display_addr > view_address + windows_addr_size) {
+        return; // this event isn't in the windows, continue with the next one
+    } else if (event_display_addr < view_address) {
+        // the begin address is out of the windows
+        masked_size = view_address - event_display_addr;
+        event_display_addr = 0;
+    } else {
+        event_display_addr = event_display_addr - view_address;
+    }
+
+    setColor(event.type);
+    painter->drawRect(event_display_addr*address_zoom_factor,
+                      (event.time - view_time)*time_zoom_factor,
+                       max<int>((event.size - masked_size)*address_zoom_factor, size_px)*size_factor,
+                       max<int>(time_zoom_factor, size_px)*size_factor);
 }
 
 void TMGraphView::paintEvent(QPaintEvent* /*event*/)
@@ -521,6 +630,10 @@ void TMGraphView::paintEvent(QPaintEvent* /*event*/)
     // We adapt the size to keep each event size above 1px if the zoom is too low
     if(trace_state == TRACE_READY)
     {
+        if (display_ptr_event && ptr_event.time >= view_time && ptr_event.time < view_time + current_windows_time_size)
+        {
+            paintOneEvent(ptr_event, current_windows_addr_size);
+        }
         QList<MemoryBlock>::iterator block_it = blocks.begin();
         // Looking for blocks inside our view
         while(block_it != blocks.end())
@@ -546,27 +659,7 @@ void TMGraphView::paintEvent(QPaintEvent* /*event*/)
                          break;
                      else if(event_it->time >= view_time)
                      {
-                         unsigned long long event_display_addr = realAddressToDisplayAddress(event_it->address);
-                         unsigned int masked_size = 0;
-                         if (event_display_addr + event_it->size < view_address) {
-                             event_it++;
-                             continue; // this event isn't in the windows, continue with the next one
-                         } else if (event_display_addr > view_address + current_windows_addr_size) {
-                             event_it++;
-                             continue; // this event isn't in the windows, continue with the next one
-                         } else if (event_display_addr < view_address) {
-                             // the begin address is out of the windows
-                             masked_size = view_address - event_display_addr;
-                             event_display_addr = 0;
-                         } else {
-                             event_display_addr = event_display_addr - view_address;
-                         }
-
-                         setColor(event_it->type);
-                         painter->drawRect(event_display_addr*address_zoom_factor,
-                                           (event_it->time - view_time)*time_zoom_factor,
-                                            max<int>((event_it->size - masked_size)*address_zoom_factor, size_px)*size_factor,
-                                            max<int>(time_zoom_factor, size_px)*size_factor);
+                         paintOneEvent(*event_it, current_windows_addr_size);
                      }
                      event_it++;
                  }

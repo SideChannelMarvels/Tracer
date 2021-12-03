@@ -217,10 +217,17 @@ void SqliteClient::queryEvents()
     emit dbProcessingFinished();
 }
 
+
+
 void SqliteClient::queryEventDescription(Event ev)
 {
     QString description;
-    int evN;
+    unsigned int evN;
+    if (ev.type == EVENT_PTR)
+    {
+        queryMemoryDumpDescription(ev);
+        return;
+    }
     for (evN = 0; evN < ev.nbID; evN++)
     {
         sqlite3_stmt *query;
@@ -232,6 +239,7 @@ void SqliteClient::queryEventDescription(Event ev)
         {
             description = "Unkown event type.";
             emit receivedEventDescription(description);
+            sqlite3_finalize(query);
             return;
         }
 
@@ -254,9 +262,66 @@ void SqliteClient::queryEventDescription(Event ev)
             description.append("Event not found in database.\n\n");
             printf("%llx\n", ev.id[evN]);
         }
+        sqlite3_finalize(query);
     }
 
     emit receivedEventDescription(description);
+}
+
+void SqliteClient::queryMemoryDumpDescription(Event ev)
+{
+    int missing = ev.size;
+    char* rawData = (char*) malloc(ev.size * 2 + 1);
+    if (rawData == nullptr)
+    {
+        return;
+    }
+    memset(rawData, '?', ev.size * 2);
+    rawData[ev.size * 2] = '\0';
+
+    sqlite3_stmt *query;
+    sqlite3_prepare_v2(db, "SELECT ins_id, type, addr, size, data FROM mem WHERE ins_id <= ? ORDER BY ins_id DESC, type DESC;", -1, &query, NULL);
+    sqlite3_bind_int64(query, 1, ev.time);
+
+    while (missing != 0 && sqlite3_step(query) == SQLITE_ROW)
+    {
+        unsigned long long address = strtoul((const char*) sqlite3_column_text(query, 2), NULL, 16);
+        unsigned long size = sqlite3_column_int(query, 3);
+
+        if (address + size <= ev.address || ev.address + ev.size <= address)
+        {
+            continue;
+        }
+
+        unsigned long long position = (address<ev.address) ? ev.address : address;
+        const char* data = (const char*) sqlite3_column_text(query, 4);
+        while (position < address + size && position < ev.address + ev.size) {
+            unsigned int positionBuff = (position - ev.address) * 2;
+            unsigned int positionData = (position - address) * 2;
+
+            if (rawData[positionBuff] == '?') {
+                rawData[positionBuff] = data[positionData];
+                rawData[positionBuff+1] = data[positionData+1];
+                missing --;
+            }
+            position ++;
+        }
+    }
+    sqlite3_finalize(query);
+
+
+    QString description;
+    description.append("address : 0x");
+    description.append(QString("%1").arg(ev.address, 16, 16, QLatin1Char('0')));
+    description.append("\nsize : ");
+    description.append(QString("%1").arg(ev.size, 0, 10, QLatin1Char('0')));
+    description.append("\ndata : ");
+    description.append(rawData);
+    description.append("\n");
+
+
+    emit receivedEventDescription(description);
+    free(rawData);
 }
 
 void SqliteClient::cleanup()

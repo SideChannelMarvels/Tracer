@@ -39,7 +39,7 @@ on the graph:
 * Black blocks represent executed instructions.
 * Green blocks represent memory reads.
 * Red blocks represent memory writes.
-* Blue blocks represent memory reads and writes.
+* Yellow blocks represent memory reads and writes.
 
 There are also vertical orange lines which represent memory space ellipsis. Indeed the memory space
 of a binary is usually too sparse to display in full on the screen, this is why TraceGraph cuts the
@@ -52,6 +52,7 @@ will be displayed on the right pane. The complete command list:
 * arrow keys: move arround.
 * left click: select block.
 * left click drag: move arround.
+* ctrl + left click: dump data (max 1024 bytes)
 * scroll up: zoom in.
 * scroll down: zoom out.
 * ctrl + scroll up: zoom in on address axis only.

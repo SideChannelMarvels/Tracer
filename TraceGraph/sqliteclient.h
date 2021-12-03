@@ -34,7 +34,8 @@ enum EVENT_TYPE
     EVENT_W = 1 << 1,
     EVENT_RW = 1 | (1 << 1),
     EVENT_INS = 1 << 2,
-    EVENT_UFO = 1 << 3
+    EVENT_UFO = 1 << 3,
+    EVENT_PTR = 1 << 4
 };
 
 struct Event
@@ -74,6 +75,7 @@ public slots:
     void queryStats();
     void queryEvents();
     void queryEventDescription(Event ev);
+    void queryMemoryDumpDescription(Event ev);
     void cleanup();
 
 private:

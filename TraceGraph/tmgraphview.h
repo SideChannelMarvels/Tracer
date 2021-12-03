@@ -90,8 +90,8 @@ public slots:
     void onWindowResize();
 
 private:
-    QBrush rbrush, wbrush, rwbrush, ibrush;
-    QPen rpen, wpen, rwpen,ipen;
+    QBrush rbrush, wbrush, rwbrush, ibrush, ptrbrush;
+    QPen rpen, wpen, rwpen, ipen, ptrpen;
     SqliteClient *sqlite_client;
     QPainter *painter;
     unsigned long long view_address, view_time;
@@ -104,12 +104,17 @@ private:
     TraceState trace_state;
     QPoint drag_last_pos, drag_start, zoom_start;
 
+    bool display_ptr_event, draw_ptr_event;
+    Event ptr_event;
+
     void setColor(EVENT_TYPE type);
     void regionProcessing();
     unsigned long long realAddressToDisplayAddress(unsigned long long address);
     unsigned long long displayAddressToRealAddress(unsigned long long address);
     Event findEventAt(const QPoint pos);
     void updateZoomFactors();
+    void paintOneEvent(const Event& e, unsigned long windows_addr_size);
+    void setPtrEvent(QMouseEvent * event);
 
 protected:
     void wheelEvent(QWheelEvent *event);
