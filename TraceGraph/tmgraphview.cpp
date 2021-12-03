@@ -112,6 +112,21 @@ void TMGraphView::onDBProcessingFinished()
 
 void TMGraphView::onEventReceived(Event ev)
 {
+    unsigned long long startAddrBlock = ev.address & 0xFFFFFFFFFFFFF000;
+    unsigned long long endAddrBlock = (ev.address + ev.size - 1) & 0xFFFFFFFFFFFFF000;
+
+    while (startAddrBlock != endAddrBlock) {
+      // split event on multiple pages
+      unsigned int firstBlocSize = startAddrBlock + 0x1000 - ev.address;
+      Event ev2 = ev;
+      ev2.size = firstBlocSize;
+      ev.size = ev.size - firstBlocSize;
+      ev.address = startAddrBlock + 0x1000;
+
+      onEventReceived(ev2);
+      startAddrBlock = ev.address & 0xFFFFFFFFFFFFF000;
+    }
+
     QList<MemoryBlock>::iterator block_it = blocks.begin();
     bool block_found = false;
     while(block_it != blocks.end())
