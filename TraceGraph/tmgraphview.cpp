@@ -514,6 +514,8 @@ void TMGraphView::setColor(EVENT_TYPE type)
 
 void TMGraphView::paintEvent(QPaintEvent* /*event*/)
 {
+    unsigned long current_windows_addr_size = (unsigned long)this->width()/address_zoom_factor;
+    unsigned long current_windows_time_size = (unsigned long)this->height()/time_zoom_factor;
     painter->begin(this);
     painter->setRenderHint(QPainter::Antialiasing, true);
     // We adapt the size to keep each event size above 1px if the zoom is too low
@@ -523,7 +525,7 @@ void TMGraphView::paintEvent(QPaintEvent* /*event*/)
         // Looking for blocks inside our view
         while(block_it != blocks.end())
         {
-             if(block_it->display_address > view_address + (unsigned long)this->width()/address_zoom_factor)
+             if(block_it->display_address > view_address + current_windows_addr_size)
                  break; // block is outside of the view so it will be the same for the following blocks thus we break
              else if(block_it->display_address + block_it->size > view_address)
              {
@@ -540,14 +542,30 @@ void TMGraphView::paintEvent(QPaintEvent* /*event*/)
                  QList<Event>::iterator event_it = block_it->events.begin();
                  while(event_it != block_it->events.end())
                  {
-                     if(event_it->time > view_time + (unsigned long)this->height()/time_zoom_factor)
+                     if(event_it->time > view_time + current_windows_time_size)
                          break;
                      else if(event_it->time >= view_time)
                      {
+                         unsigned long long event_display_addr = realAddressToDisplayAddress(event_it->address);
+                         unsigned int masked_size = 0;
+                         if (event_display_addr + event_it->size < view_address) {
+                             event_it++;
+                             continue; // this event isn't in the windows, continue with the next one
+                         } else if (event_display_addr > view_address + current_windows_addr_size) {
+                             event_it++;
+                             continue; // this event isn't in the windows, continue with the next one
+                         } else if (event_display_addr < view_address) {
+                             // the begin address is out of the windows
+                             masked_size = view_address - event_display_addr;
+                             event_display_addr = 0;
+                         } else {
+                             event_display_addr = event_display_addr - view_address;
+                         }
+
                          setColor(event_it->type);
-                         painter->drawRect((realAddressToDisplayAddress(event_it->address) - view_address)*address_zoom_factor,
+                         painter->drawRect(event_display_addr*address_zoom_factor,
                                            (event_it->time - view_time)*time_zoom_factor,
-                                            max<int>(event_it->size*address_zoom_factor, size_px)*size_factor,
+                                            max<int>((event_it->size - masked_size)*address_zoom_factor, size_px)*size_factor,
                                             max<int>(time_zoom_factor, size_px)*size_factor);
                      }
                      event_it++;
