@@ -120,7 +120,4 @@ protected:
     void mouseReleaseEvent(QMouseEvent * event);
 };
 
-int min(const int a, const int b);
-int max(const int a, const int b);
-
 #endif // TMGRAPHVIEW_H

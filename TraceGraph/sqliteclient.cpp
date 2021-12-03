@@ -181,17 +181,19 @@ void SqliteClient::queryEvents()
     {
         Event ins_ev;
         ins_ev.type = EVENT_INS;
-        ins_ev.id = sqlite3_column_int64(ins_query, 0);
+        ins_ev.id[0] = sqlite3_column_int64(ins_query, 0);
+        ins_ev.nbID = 1;
         ins_ev.address = strtoul((const char*) sqlite3_column_text(ins_query, 1), NULL, 16);
         ins_ev.size = strlen((const char*) sqlite3_column_text(ins_query, 2))/2;
         ins_ev.time = time;
 
-        sqlite3_bind_int64(mem_query, 1, ins_ev.id);
+        sqlite3_bind_int64(mem_query, 1, ins_ev.id[0]);
 
-        while(sqlite3_column_int(mem_query, 1) == ins_ev.id)
+        while(sqlite3_column_int(mem_query, 1) == ins_ev.id[0])
         {
             Event mem_ev;
-            mem_ev.id = sqlite3_column_int64(mem_query, 0);
+            mem_ev.id[0] = sqlite3_column_int64(mem_query, 0);
+            mem_ev.nbID = 1;
             if(strcmp((const char*) sqlite3_column_text(mem_query, 2), "R") == 0)
                 mem_ev.type = EVENT_R;
             else if(strcmp((const char*) sqlite3_column_text(mem_query, 2), "W") == 0)
@@ -218,34 +220,40 @@ void SqliteClient::queryEvents()
 void SqliteClient::queryEventDescription(Event ev)
 {
     QString description;
-    sqlite3_stmt *query;
-    if(ev.type == EVENT_INS)
-        sqlite3_prepare_v2(db, "SELECT * from INS where rowid=?;", -1, &query, NULL);
-    else if(ev.type == EVENT_R || ev.type == EVENT_W)
-        sqlite3_prepare_v2(db, "SELECT * from mem where rowid=?;", -1, &query, NULL);
-    else
+    int evN;
+    for (evN = 0; evN < ev.nbID; evN++)
     {
-        description = "Unkown event type.";
-        emit receivedEventDescription(description);
-        return;
-    }
-
-    sqlite3_bind_int64(query, 1, ev.id);
-    if(sqlite3_step(query) == SQLITE_ROW)
-    {
-        int i;
-        int column_count = sqlite3_column_count(query);
-        for(i = 0; i < column_count; i++)
+        sqlite3_stmt *query;
+        if(ev.type == EVENT_INS)
+            sqlite3_prepare_v2(db, "SELECT * from INS where rowid=?;", -1, &query, NULL);
+        else if(ev.type == EVENT_R || ev.type == EVENT_W || ev.type == EVENT_RW)
+            sqlite3_prepare_v2(db, "SELECT * from mem where rowid=?;", -1, &query, NULL);
+        else
         {
-            description.append(sqlite3_column_name(query, i));
-            description.append(": ");
-            description.append((const char*)sqlite3_column_text(query, i));
+            description = "Unkown event type.";
+            emit receivedEventDescription(description);
+            return;
+        }
+
+        sqlite3_bind_int64(query, 1, ev.id[evN]);
+        if(sqlite3_step(query) == SQLITE_ROW)
+        {
+            int i;
+            int column_count = sqlite3_column_count(query);
+            for(i = 0; i < column_count; i++)
+            {
+                description.append(sqlite3_column_name(query, i));
+                description.append(": ");
+                description.append((const char*)sqlite3_column_text(query, i));
+                description.append("\n");
+            }
             description.append("\n");
         }
-    }
-    else
-    {
-        description = "Event not found in database.";
+        else
+        {
+            description.append("Event not found in database.\n\n");
+            printf("%llx\n", ev.id[evN]);
+        }
     }
 
     emit receivedEventDescription(description);

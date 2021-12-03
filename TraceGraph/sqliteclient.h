@@ -32,6 +32,7 @@ enum EVENT_TYPE
 {
     EVENT_R = 1,
     EVENT_W = 1 << 1,
+    EVENT_RW = 1 | (1 << 1),
     EVENT_INS = 1 << 2,
     EVENT_UFO = 1 << 3
 };
@@ -41,7 +42,8 @@ struct Event
     unsigned long long time;
     unsigned long long address;
     unsigned int size;
-    long long id;
+    long long id[2];
+    unsigned nbID;
     EVENT_TYPE type;
 };
 

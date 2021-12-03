@@ -22,19 +22,23 @@
 /* ===================================================================== */
 #include "tmgraphview.h"
 
-int min(const int a, const int b)
+template <class T>
+const T& min(const T& a, const T& b)
 {
     if(a < b)
         return a;
     return b;
 }
 
-int max(const int a, const int b)
+template <class T>
+const T& max(const T& a, const T& b)
 {
     if(a > b)
         return a;
     return b;
 }
+
+
 
 TMGraphView::TMGraphView(QWidget *parent) :
     QWidget(parent)
@@ -131,7 +135,48 @@ void TMGraphView::onEventReceived(Event ev)
         bl.size = 0x1000;
         block_it = blocks.insert(block_it, bl);
     }
-    block_it->events.append(ev);
+    // merge event if an instruction read and write the same address
+    if ((ev.type & (EVENT_R | EVENT_W)) != 0) {
+        QList<Event>::reverse_iterator event_rit = block_it->events.rbegin();
+        bool merge = false;
+        while (event_rit != block_it->events.rend() and event_rit->time == ev.time) {
+            if ((event_rit->type & (EVENT_R | EVENT_W)) == 0) {
+                event_rit++;
+                continue;
+            }
+            if (event_rit->address + event_rit->size <= ev.address) {
+                event_rit++;
+                continue;
+            }
+            if (ev.address + ev.size <= event_rit->address) {
+                event_rit++;
+                continue;
+            }
+            // the two event has the same time, a type R|W and the range of
+            // address intersect
+            if (event_rit->nbID == sizeof(event_rit->id) / sizeof(event_rit->id[0])){
+                // cannot merge the two events
+                break;
+            }
+            merge = true;
+            unsigned long long start_addr = min(event_rit->address, ev.address);
+            unsigned long long end_addr = max(ev.address + ev.size, event_rit->address + event_rit->size);
+
+            if ((event_rit->type | ev.type) == EVENT_RW) {
+                event_rit->type = EVENT_RW;
+            }
+            event_rit->address = start_addr;
+            event_rit->size = end_addr - start_addr;
+            event_rit->id[event_rit->nbID] = ev.id[0];
+            event_rit->nbID ++;
+            break;
+        }
+        if (!merge) {
+            block_it->events.append(ev);
+        }
+    } else {
+        block_it->events.append(ev);
+    }
     if(ev.time > total_time)
         total_time = ev.time;
 }
@@ -206,9 +251,9 @@ Event TMGraphView::findEventAt(QPoint pos)
                 if(time < event_it->time)
                     break; // We are too far in time
                 else if(time >= event_it->time &&
-                        time < (event_it->time + max(1, size_px/time_zoom_factor)) &&
+                        time < (event_it->time + max<int>(1, size_px/time_zoom_factor)) &&
                         address >= event_it->address &&
-                        address < event_it->address + max(event_it->size, size_px/address_zoom_factor))
+                        address < event_it->address + max<int>(event_it->size, size_px/address_zoom_factor))
                     return *event_it; // Found it!
             }
         }
@@ -353,7 +398,7 @@ void TMGraphView::keyPressEvent(QKeyEvent * event)
     }
     else if(event->key() == Qt::Key_Minus)
     {
-        size_px=max(size_px-1,1);
+        size_px=max<int>(size_px-1,1);
         update();
     }
 }
@@ -487,8 +532,8 @@ void TMGraphView::paintEvent(QPaintEvent* /*event*/)
                          setColor(event_it->type);
                          painter->drawRect((realAddressToDisplayAddress(event_it->address) - view_address)*address_zoom_factor,
                                            (event_it->time - view_time)*time_zoom_factor,
-                                            max(event_it->size*address_zoom_factor, size_px)*size_factor,
-                                            max(time_zoom_factor, size_px)*size_factor);
+                                            max<int>(event_it->size*address_zoom_factor, size_px)*size_factor,
+                                            max<int>(time_zoom_factor, size_px)*size_factor);
                      }
                      event_it++;
                  }

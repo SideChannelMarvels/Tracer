@@ -1,7 +1,7 @@
 TraceGraph
 ==========
 
-TraceGraph is a GUI for visualizing execution traces produced by TracerGrind and TracerPin. 
+TraceGraph is a GUI for visualizing execution traces produced by TracerGrind and TracerPin.
 
 Installation
 ------------
@@ -28,24 +28,25 @@ and adapt `target.path = /usr/bin` to your needs.
 Usage
 -----
 
-Use the `File > Open Database` menu to open a sqlite database. Once the database is loaded, use 
-the `Trace > Overview zoom` to display the entire trace on screen (this might take a while on 
+Use the `File > Open Database` menu to open a sqlite database. Once the database is loaded, use
+the `Trace > Overview zoom` to display the entire trace on screen (this might take a while on
 large traces).
 
-The vertical axis represents the time with the earliest event at the top while the horizontal axis 
-represents the memory space with the lowest address on the left. There are 3 types of block visible 
+The vertical axis represents the time with the earliest event at the top while the horizontal axis
+represents the memory space with the lowest address on the left. There are 3 types of block visible
 on the graph:
 
 * Black blocks represent executed instructions.
 * Green blocks represent memory reads.
 * Red blocks represent memory writes.
+* Blue blocks represent memory reads and writes.
 
-There are also vertical orange lines which represent memory space ellipsis. Indeed the memory space 
-of a binary is usually too sparse to display in full on the screen, this is why TraceGraph cuts the 
-memory pages which are never addressed in the trace from the graph. Those cuts are represented by 
+There are also vertical orange lines which represent memory space ellipsis. Indeed the memory space
+of a binary is usually too sparse to display in full on the screen, this is why TraceGraph cuts the
+memory pages which are never addressed in the trace from the graph. Those cuts are represented by
 orange vertical lines with the start address of the visible block written at the bottom.
 
-You can also click on a block (*) to obtain informations which 
+You can also click on a block (*) to obtain informations which
 will be displayed on the right pane. The complete command list:
 
 * arrow keys: move arround.
@@ -62,7 +63,7 @@ will be displayed on the right pane. The complete command list:
 * +: increase block size
 * -: decrease block size (up to 1 pixel)
 
-Additionally you can save a image of the graph currently on screen (you know, for making slides 
+Additionally you can save a image of the graph currently on screen (you know, for making slides
 and stuff ;D).
 
 (*) to ease that process, you can increase temporarily the blocks size (press "+" several times).
