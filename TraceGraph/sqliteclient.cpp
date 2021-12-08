@@ -217,6 +217,34 @@ void SqliteClient::queryEvents()
     emit dbProcessingFinished();
 }
 
+QString SqliteClient::queryInstDescription(unsigned long long id)
+{
+    QString description;
+    sqlite3_stmt *query;
+    sqlite3_prepare_v2(db, "SELECT * from INS where rowid=?;", -1, &query, NULL);
+
+    sqlite3_bind_int64(query, 1, id);
+    if(sqlite3_step(query) == SQLITE_ROW)
+    {
+        int i;
+        int column_count = sqlite3_column_count(query);
+        for(i = 0; i < column_count; i++)
+        {
+            description.append(sqlite3_column_name(query, i));
+            description.append(": ");
+            description.append((const char*)sqlite3_column_text(query, i));
+            description.append("\n");
+        }
+        description.append("\n");
+    }
+    else
+    {
+        description.append("Event not found in database.\n\n");
+    }
+    sqlite3_finalize(query);
+
+    return description;
+}
 
 
 void SqliteClient::queryEventDescription(Event ev)
@@ -228,27 +256,34 @@ void SqliteClient::queryEventDescription(Event ev)
         queryMemoryDumpDescription(ev);
         return;
     }
+    if (ev.type == EVENT_INS)
+    {
+        if (ev.nbID >= 1) {
+            emit receivedEventDescription(queryInstDescription(ev.id[0]));
+        }
+        return;
+    }
+    if (ev.type != EVENT_R && ev.type != EVENT_W && ev.type != EVENT_RW)
+    {
+        description = "Unkown event type.";
+        emit receivedEventDescription(description);
+        return;
+    }
+
     for (evN = 0; evN < ev.nbID; evN++)
     {
         sqlite3_stmt *query;
-        if(ev.type == EVENT_INS)
-            sqlite3_prepare_v2(db, "SELECT * from INS where rowid=?;", -1, &query, NULL);
-        else if(ev.type == EVENT_R || ev.type == EVENT_W || ev.type == EVENT_RW)
-            sqlite3_prepare_v2(db, "SELECT * from mem where rowid=?;", -1, &query, NULL);
-        else
-        {
-            description = "Unkown event type.";
-            emit receivedEventDescription(description);
-            sqlite3_finalize(query);
-            return;
-        }
-
+        sqlite3_prepare_v2(db, "SELECT ins_id, type, addr, addr_end, size, data, value from mem where rowid=?;", -1, &query, NULL);
         sqlite3_bind_int64(query, 1, ev.id[evN]);
         if(sqlite3_step(query) == SQLITE_ROW)
         {
+            if (evN == 0) {
+                description.append(queryInstDescription(sqlite3_column_int64(query, 0)));
+                description.append("\n");
+            }
             int i;
             int column_count = sqlite3_column_count(query);
-            for(i = 0; i < column_count; i++)
+            for(i = 1; i < column_count; i++)
             {
                 description.append(sqlite3_column_name(query, i));
                 description.append(": ");
@@ -260,7 +295,6 @@ void SqliteClient::queryEventDescription(Event ev)
         else
         {
             description.append("Event not found in database.\n\n");
-            printf("%llx\n", ev.id[evN]);
         }
         sqlite3_finalize(query);
     }
@@ -295,13 +329,18 @@ void SqliteClient::queryMemoryDumpDescription(Event ev)
 
         unsigned long long position = (address<ev.address) ? ev.address : address;
         const char* data = (const char*) sqlite3_column_text(query, 4);
+        unsigned int lendata = strlen(data);
         while (position < address + size && position < ev.address + ev.size) {
             unsigned int positionBuff = (position - ev.address) * 2;
             unsigned int positionData = (position - address) * 2;
-
             if (rawData[positionBuff] == '?') {
-                rawData[positionBuff] = data[positionData];
-                rawData[positionBuff+1] = data[positionData+1];
+                if (lendata >= positionData + 2) {
+                    rawData[positionBuff] = data[positionData];
+                    rawData[positionBuff+1] = data[positionData+1];
+                } else {
+                    rawData[positionBuff] = '_';
+                    rawData[positionBuff+1] = '_';
+                }
                 missing --;
             }
             position ++;

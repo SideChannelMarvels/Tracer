@@ -535,15 +535,15 @@ void TMGraphView::setPtrEvent(QMouseEvent* event)
 
   if (address < start_address)
   {
-      if (start_address - address > max_size)
+      if (start_address - address >= max_size)
       {
-          ptr_event.address = start_address - max_size;
+          ptr_event.address = start_address + 1 - max_size;
           ptr_event.size = max_size;
       }
       else
       {
           ptr_event.address = address;
-          ptr_event.size = start_address - address;
+          ptr_event.size = start_address + 1 - address;
       }
       if (realAddressToDisplayAddress(ptr_event.address) == 0xffffffffffffffff)
       {
@@ -553,7 +553,7 @@ void TMGraphView::setPtrEvent(QMouseEvent* event)
   }
   else
   {
-      if (address - start_address > max_size)
+      if (address - start_address >= max_size)
       {
           ptr_event.address = start_address;
           ptr_event.size = max_size;
@@ -561,7 +561,7 @@ void TMGraphView::setPtrEvent(QMouseEvent* event)
       else
       {
           ptr_event.address = start_address;
-          ptr_event.size = address - start_address;
+          ptr_event.size = address + 1 - start_address;
       }
       if (realAddressToDisplayAddress(ptr_event.address + ptr_event.size) == 0xffffffffffffffff)
       {

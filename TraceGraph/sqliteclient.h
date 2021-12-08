@@ -75,11 +75,13 @@ public slots:
     void queryStats();
     void queryEvents();
     void queryEventDescription(Event ev);
-    void queryMemoryDumpDescription(Event ev);
     void cleanup();
 
 private:
     sqlite3 *db;
+
+    QString queryInstDescription(unsigned long long id);
+    void queryMemoryDumpDescription(Event ev);
 };
 
 #endif // SQLITECLIENT_H
