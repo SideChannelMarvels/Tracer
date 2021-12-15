@@ -44,15 +44,15 @@ TMGraphView::TMGraphView(QWidget *parent) :
     QWidget(parent)
 {
     painter = new QPainter();
-    rbrush.setColor(Qt::green);
+    rbrush.setColor(/* green */ QColor(0x00, 0xa0, 0x00));
     rbrush.setStyle(Qt::SolidPattern);
-    rpen.setColor(Qt::green);
+    rpen.setColor(/* green */ QColor(0x00, 0xa0, 0x00));
     wbrush.setColor(Qt::red);
     wbrush.setStyle(Qt::SolidPattern);
     wpen.setColor(Qt::red);
-    rwbrush.setColor(Qt::yellow);
+    rwbrush.setColor(/* orange */ QColor(0xFF, 0x8C, 0x00));
     rwbrush.setStyle(Qt::SolidPattern);
-    rwpen.setColor(Qt::yellow);
+    rwpen.setColor(/* orange */ QColor(0xFF, 0x8C, 0x00));
     ibrush.setColor(Qt::black);
     ibrush.setStyle(Qt::SolidPattern);
     ipen.setColor(Qt::black);

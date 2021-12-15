@@ -39,7 +39,7 @@ on the graph:
 * Black blocks represent executed instructions.
 * Green blocks represent memory reads.
 * Red blocks represent memory writes.
-* Yellow blocks represent memory reads and writes.
+* Orange blocks represent memory reads and writes.
 
 There are also vertical orange lines which represent memory space ellipsis. Indeed the memory space
 of a binary is usually too sparse to display in full on the screen, this is why TraceGraph cuts the
