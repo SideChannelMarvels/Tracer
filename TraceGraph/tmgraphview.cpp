@@ -389,12 +389,12 @@ void TMGraphView::wheelEvent(QWheelEvent *event)
     Qt::KeyboardModifiers mod = QGuiApplication::keyboardModifiers();
     if(mod == Qt::NoModifier || mod == Qt::ControlModifier)
     {
-        addressMove((long long)(event->pos().x()/address_zoom_factor*(2*f)/(1+f)));
+        addressMove((long long)(event->position().x()/address_zoom_factor*(2*f)/(1+f)));
         address_zoom_factor *= (1+f)/(1-f);
     }
     if(mod == Qt::NoModifier || mod == Qt::ShiftModifier)
     {
-        timeMove((long long)(event->pos().y()/time_zoom_factor*(2*f)/(1+f)));
+        timeMove((long long)(event->position().y()/time_zoom_factor*(2*f)/(1+f)));
         time_zoom_factor *= (1+f)/(1-f);
     }
     update();
@@ -628,10 +628,10 @@ void TMGraphView::paintOneEvent(const Event& event, unsigned long windows_addr_s
     }
 
     // real coordonate before adding border
-    int x = event_display_addr*address_zoom_factor;
-    int y = (event.time - view_time)*time_zoom_factor;
-    int width = max<int>((event.size - masked_size)*address_zoom_factor, 1);
-    int height = max<int>(time_zoom_factor, 1);
+    unsigned int x = event_display_addr*address_zoom_factor;
+    unsigned int y = (event.time - view_time)*time_zoom_factor;
+    unsigned int width = max<int>((event.size - masked_size)*address_zoom_factor, 1);
+    unsigned int height = max<int>(time_zoom_factor, 1);
     if ( x < (size_border/2))
     {
         width += size_border - (size_border/2) + x;
