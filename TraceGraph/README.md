@@ -62,7 +62,7 @@ will be displayed on the right pane. The complete command list:
 * right click drag: zoom in the dragged rectangle.
 * ctrl + right click drag: zoom out form the dragged rectangle.
 * +: increase block size
-* -: decrease block size (up to 1 pixel)
+* -: decrease block size
 
 Additionally you can save a image of the graph currently on screen (you know, for making slides
 and stuff ;D).

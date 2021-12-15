@@ -96,8 +96,8 @@ private:
     QPainter *painter;
     unsigned long long view_address, view_time;
     unsigned long long total_bytes, total_time;
-    double address_zoom_factor, time_zoom_factor, size_factor;
-    unsigned long long size_px;
+    double address_zoom_factor, time_zoom_factor;
+    unsigned long long size_border;
     QList<MemoryBlock> blocks;
     QList<Region> regions;
     ZoomState zoom_state;

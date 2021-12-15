@@ -62,8 +62,7 @@ TMGraphView::TMGraphView(QWidget *parent) :
     view_address = 0;
     view_time = 0;
     total_time = 0;
-    size_factor = 1;
-    size_px = 1;
+    size_border = 0;
     address_zoom_factor = 1;
     time_zoom_factor = 1;
     zoom_state = NO_ZOOM;
@@ -258,25 +257,42 @@ unsigned long long  TMGraphView::displayAddressToRealAddress(unsigned long long 
 Event TMGraphView::findEventAt(QPoint pos)
 {
     // Converting screen coordinates to real address and time
-    unsigned long long address = displayAddressToRealAddress(view_address + pos.x()/address_zoom_factor);
-    unsigned long long time = (unsigned long long)(view_time + pos.y()/time_zoom_factor);
+    unsigned long long min_address = displayAddressToRealAddress(view_address +
+        (pos.x() - (size_border - size_border/2)) / address_zoom_factor);
+    unsigned long long max_address = displayAddressToRealAddress(view_address +
+        (pos.x() + (size_border/2)) / address_zoom_factor);
+    unsigned long long min_time = (unsigned long long)(view_time +
+        (pos.y() - (size_border - size_border/2)) / time_zoom_factor);
+    unsigned long long max_time = (unsigned long long)(view_time +
+        (pos.y() + (size_border/2)) / time_zoom_factor);
     // Looking for the right memory block
     for(QList<MemoryBlock>::iterator block_it = blocks.begin(); block_it != blocks.end(); block_it++)
     {
-        if(address < block_it->address)
+        if(max_address < block_it->address)
+        {
             break;// We are too far in memory space
-        else if(address >= block_it->address && address < block_it->address + block_it->size)
+        }
+        else if (block_it->address + block_it->size <= min_address)
+        {
+            continue;
+        }
+        else
         {
             // Looking for the right event (if it exist)
             for(QList<Event>::iterator event_it = block_it->events.begin(); event_it != block_it->events.end(); event_it++)
             {
-                if(time < event_it->time)
+                if(max_time < event_it->time)
+                {
                     break; // We are too far in time
-                else if(time >= event_it->time &&
-                        time < (event_it->time + max<int>(1, size_px/time_zoom_factor)) &&
-                        address >= event_it->address &&
-                        address < event_it->address + max<int>(event_it->size, size_px/address_zoom_factor))
+                }
+                else if(event_it->time < min_time)
+                {
+                    continue;
+                }
+                else if(event_it->address <= max_address && min_address < event_it->address + event_it->size)
+                {
                     return *event_it; // Found it!
+                }
             }
         }
     }
@@ -381,12 +397,6 @@ void TMGraphView::wheelEvent(QWheelEvent *event)
         timeMove((long long)(event->pos().y()/time_zoom_factor*(2*f)/(1+f)));
         time_zoom_factor *= (1+f)/(1-f);
     }
-    else if(mod ==Qt::AltModifier)
-    {
-        size_factor *= (1+f)/(1-f);
-        if(size_factor < 1)
-            size_factor = 1;
-    }
     update();
 }
 
@@ -415,13 +425,16 @@ void TMGraphView::keyPressEvent(QKeyEvent * event)
     }
     else if(event->key() == Qt::Key_Plus)
     {
-        size_px+=1;
+        size_border+=1;
         update();
     }
     else if(event->key() == Qt::Key_Minus)
     {
-        size_px=max<int>(size_px-1,1);
-        update();
+        if (size_border > 0)
+        {
+            size_border-=1;
+            update();
+        }
     }
 }
 
@@ -614,11 +627,30 @@ void TMGraphView::paintOneEvent(const Event& event, unsigned long windows_addr_s
         event_display_addr = event_display_addr - view_address;
     }
 
+    // real coordonate before adding border
+    int x = event_display_addr*address_zoom_factor;
+    int y = (event.time - view_time)*time_zoom_factor;
+    int width = max<int>((event.size - masked_size)*address_zoom_factor, 1);
+    int height = max<int>(time_zoom_factor, 1);
+    if ( x < (size_border/2))
+    {
+        width += size_border - (size_border/2) + x;
+        x = 0;
+    } else {
+        width += size_border;
+        x -= (size_border/2);
+    }
+    if ( y < (size_border/2))
+    {
+        height += size_border - (size_border/2) + y;
+        y = 0;
+    } else {
+        height += size_border;
+        y -= (size_border/2);
+    }
+
     setColor(event.type);
-    painter->drawRect(event_display_addr*address_zoom_factor,
-                      (event.time - view_time)*time_zoom_factor,
-                       max<int>((event.size - masked_size)*address_zoom_factor, size_px)*size_factor,
-                       max<int>(time_zoom_factor, size_px)*size_factor);
+    painter->drawRect(x, y, width, height);
 }
 
 void TMGraphView::paintEvent(QPaintEvent* /*event*/)
