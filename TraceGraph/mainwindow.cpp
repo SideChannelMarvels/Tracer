@@ -114,7 +114,7 @@ void MainWindow::on_actionSave_Image_triggered()
 {
     QString filename = QFileDialog::getSaveFileName(this, "Save graph as image");
     if(filename != NULL) {
-        QPixmap image = QPixmap::grabWidget(ui->graph);
+        QPixmap image = ui->graph->grab();
         image.save(filename);
     }
 }
