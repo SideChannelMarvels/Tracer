@@ -15,7 +15,7 @@ PREFIX=/usr/local
 all: ia32 intel64
 
 $(OBJDIR)sqlite3$(OBJ_SUFFIX): sqlite3.c sqlite3.h
-	$(CC) $(TOOL_CFLAGS) -DSQLITE_THREADSAFE=0 -Wno-return-local-addr $(COMP_OBJ)$@ $<
+	$(CC) $(TOOL_CFLAGS) -DSQLITE_THREADSAFE=0 -Wno-return-local-addr -Wno-misleading-indentation $(COMP_OBJ)$@ $<
 
 $(OBJDIR)Tracer.so: $(OBJDIR)Tracer$(OBJ_SUFFIX) $(OBJDIR)sqlite3$(OBJ_SUFFIX)
 	$(LINKER) $(TOOL_LDFLAGS_NOOPT) $(LINK_EXE)$@ $(^:%.h=) $(TOOL_LPATHS) $(TOOL_LIBS)
