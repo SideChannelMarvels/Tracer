@@ -141,12 +141,10 @@ class MemTracerMarvelText:
 
     def __init__(self, file=None):
         if file is not None:
-            self.file = open(file, "r")
+            self.file = open(file, "w")
         else:
             self.file = None
-        self.regions = pyqbdi.getCurrentProcessMaps()
-
-        for r in pyqbdi.getCurrentProcessMaps():
+        for r in pyqbdi.getCurrentProcessMaps(True):
             self.print(f"Map [0x{r.range.start:x}, 0x{r.range.end:x}]: {r.name}")
 
     def print(self, s):

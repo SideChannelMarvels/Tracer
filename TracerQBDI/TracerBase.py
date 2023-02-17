@@ -68,6 +68,8 @@ class TracerBase:
         self.traceAllInstruction = traceAllInstruction
         self.memoryRange = memoryRange
         self.instructionRange = instructionRange
+        self.traceRead = traceRead
+        self.traceWrite = traceWrite
 
         if traceRead and traceWrite:
             self.traceType = pyqbdi.MEMORY_READ_WRITE
@@ -249,6 +251,13 @@ def get_environ_range(name, mainRange, stackRange):
             l.append((stackRange.range.start, stackRange.range.end))
         elif r == "target":
             l.append((mainRange.range.start, mainRange.range.end))
+        elif r[0] in ['/', '[']:
+            found = False
+            for reg in pyqbdi.getCurrentProcessMaps(True):
+                if reg.name == r:
+                    l.append((reg.range.start, reg.range.end))
+                    found = True
+            assert found, f"Doesn't found {r} in current process maps"
         else:
             if '_' in r:
                 start, end = r.split('_', 1)
@@ -270,6 +279,7 @@ def getRegionMemoryRange(addr):
 ## preload main method
 
 def pyqbdipreload_on_run(vm, start, stop):
+
     traceSqlite = not get_environ_bool("TRACER_TEXT", False)
     if traceSqlite:
         defaultTraceName = "{}.sqlite".format(sys.argv[0])
