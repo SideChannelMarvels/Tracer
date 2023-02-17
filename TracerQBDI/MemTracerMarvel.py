@@ -14,9 +14,10 @@ import sys
 # need to register MemoryAccess with 'newMemAccess' (the memory will be associate with the last register instruction)
 # create and export in the database with 'write'
 
-class MemTracerMarvel:
+class MemTracerMarvelSqlite:
 
-    def __init__(self):
+    def __init__(self, file):
+        self.file = file
         self.db = None
         self.cur = None
         self.regions = pyqbdi.getCurrentProcessMaps()
@@ -56,10 +57,10 @@ class MemTracerMarvel:
 
         self.memAccess.append((len(self.instruction), 0, t, addr, size, data))
 
-    def write(self, name):
-        if os.path.isfile(name):
-            os.remove(name)
-        self.db = sqlite3.connect(name)
+    def write(self):
+        if os.path.isfile(self.file):
+            os.remove(self.file)
+        self.db = sqlite3.connect(self.file)
         self.cur = self.db.cursor()
 
         self.write_info()
@@ -135,3 +136,44 @@ class MemTracerMarvel:
             self.cur.execute("INSERT INTO mem (ins_id, ip, type, addr, addr_end, size, data, value) VALUES (?, ?, ?, ?, ?, ?, ?, ?);",
                 (ins_id, "0x{:016x}".format(inst_addr), t, "0x{:016x}".format(addr), "0x{:016x}".format(addr+size-1),
                     size, mem_raw.hex(), v))
+
+class MemTracerMarvelText:
+
+    def __init__(self, file=None):
+        if file is not None:
+            self.file = open(file, "r")
+        else:
+            self.file = None
+        self.regions = pyqbdi.getCurrentProcessMaps()
+
+        for r in pyqbdi.getCurrentProcessMaps():
+            self.print(f"Map [0x{r.range.start:x}, 0x{r.range.end:x}]: {r.name}")
+
+    def print(self, s):
+        print(s, file=self.file)
+
+    def newBasicBlock(self, address, size):
+        self.print(f"BB address: 0x{address:x}, size: {size}")
+
+    def newInstruction(self, address, disas, raw_inst):
+        self.print(f"Inst address: 0x{address:x}, raw: {raw_inst.hex()}, disas: {disas}")
+
+    def newMemAccess(self, memoryAccess):
+        if type(memoryAccess.value) == bytes:
+            mem_raw = memoryAccess.value
+        else:
+            mem_raw = memoryAccess.value.to_bytes(memoryAccess.size, 'little')
+
+        if memoryAccess.type & pyqbdi.MEMORY_READ != 0:
+            self.print(f"Read instAddress: 0x{memoryAccess.instAddress:x}, accessAddress: 0x{memoryAccess.accessAddress:x}, "
+                       f"size: {memoryAccess.size}, value: {mem_raw.hex()}")
+
+        if memoryAccess.type & pyqbdi.MEMORY_WRITE != 0:
+            self.print(f"Write instAddress: 0x{memoryAccess.instAddress:x}, accessAddress: 0x{memoryAccess.accessAddress:x}, "
+                       f"size: {memoryAccess.size}, value: {mem_raw.hex()}")
+
+    def write(self):
+        print("", end="", file=self.file, flush=True)
+        if self.file is not None:
+            self.file.close()
+
