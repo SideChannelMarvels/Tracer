@@ -43,7 +43,7 @@ using namespace std;
 std::ofstream TraceFile;
 std::stringstream value;
 std::string strvalue;
-PIN_LOCK lock;
+PIN_LOCK _lock;
 struct moduledata_t
 {
     BOOL excluded;
@@ -251,7 +251,7 @@ VOID printInst(ADDRINT ip, string *disass, INT32 size)
         cerr << "[!] Instruction size > 32 at " << dec << bigcounter << hex << (void *)ip << " " << *disass << endl;
         return;
     }
-    PIN_GetLock(&lock, ip);
+    PIN_GetLock(&_lock, ip);
     if (InfoType >= I) bigcounter++;
     InfoType=I;
     PIN_SafeCopy(v, (void *)ip, size);
@@ -290,7 +290,7 @@ VOID printInst(ADDRINT ip, string *disass, INT32 size)
             break;
     }
 // To get context, see https://software.intel.com/sites/landingpage/pintool/docs/49306/Pin/html/group__CONTEXT__API.html
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 static VOID RecordMemHuman(ADDRINT ip, CHAR r, ADDRINT addr, UINT8* memdump, INT32 size, BOOL isPrefetch)
@@ -409,11 +409,11 @@ static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefe
     // test on logfilterlive here to avoid calls when not using live filtering
     if (logfilterlive && ExcludedAddressLive(ip))
         return;
-    PIN_GetLock(&lock, ip);
+    PIN_GetLock(&_lock, ip);
     if ((size_t)size > sizeof(memdump))
     {
         cerr << "[!] Memory size > " << sizeof(memdump) << " at " << dec << bigcounter << hex << (void *)ip << " " << (void *)addr << endl;
-        PIN_ReleaseLock(&lock);
+        PIN_ReleaseLock(&_lock);
         return;
     }
     PIN_SafeCopy(memdump, (void *)addr, size);
@@ -435,7 +435,7 @@ static VOID RecordMem(ADDRINT ip, CHAR r, ADDRINT addr, INT32 size, BOOL isPrefe
             RecordMemSqlite(ip, r, addr, memdump, size, isPrefetch);
             break;
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 static ADDRINT WriteAddr;
@@ -536,7 +536,7 @@ void ImageLoad_cb(IMG Img, void *v)
     ADDRINT lowAddress = IMG_LowAddress(Img);
     ADDRINT highAddress = IMG_HighAddress(Img);
     bool filtered = false;
-    PIN_GetLock(&lock, 0);
+    PIN_GetLock(&_lock, 0);
     if(IMG_IsMainExecutable(Img))
     {
         switch (LogType) {
@@ -606,7 +606,7 @@ void ImageLoad_cb(IMG Img, void *v)
                 break;
         }
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 /* ===================================================================== */
@@ -615,7 +615,7 @@ void ImageLoad_cb(IMG Img, void *v)
 
 void LogBasicBlock(ADDRINT addr, UINT32 size)
 {
-    PIN_GetLock(&lock, addr);
+    PIN_GetLock(&_lock, addr);
     if (InfoType >= B) bigcounter++;
     InfoType=B;
     currentbbl=bigcounter;
@@ -644,7 +644,7 @@ void LogBasicBlock(ADDRINT addr, UINT32 size)
             bbl_id = sqlite3_last_insert_rowid(db);
             break;
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
@@ -661,7 +661,7 @@ void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
         nameArg2 = RTN_FindNameByAddress(arg2);
     }
 
-    PIN_GetLock(&lock, ip);
+    PIN_GetLock(&_lock, ip);
     if (InfoType >= C) bigcounter++;
     InfoType=C;
     switch (LogType) {
@@ -690,7 +690,7 @@ void LogCallAndArgs(ADDRINT ip, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
                 printf("CALL error: %s\n", sqlite3_errmsg(db));
             break;
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 void LogIndirectCallAndArgs(ADDRINT target, BOOL taken, ADDRINT arg0, ADDRINT arg1, ADDRINT arg2)
@@ -800,7 +800,7 @@ void Trace_cb(TRACE trace, void *v)
 /* ================================================================================= */
 void ThreadStart_cb(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v)
 {
-    PIN_GetLock(&lock, threadIndex + 1);
+    PIN_GetLock(&_lock, threadIndex + 1);
     if (InfoType >= T) bigcounter++;
     InfoType=T;
     switch (LogType) {
@@ -815,13 +815,13 @@ void ThreadStart_cb(THREADID threadIndex, CONTEXT *ctxt, INT32 flags, VOID *v)
                 printf("THREAD error: %s\n", sqlite3_errmsg(db));
             break;
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 
 void ThreadFinish_cb(THREADID threadIndex, const CONTEXT *ctxt, INT32 code, VOID *v)
 {
-    PIN_GetLock(&lock, threadIndex + 1);
+    PIN_GetLock(&_lock, threadIndex + 1);
     switch (LogType) {
         case HUMAN:
             TraceFile << "[T]" << setw(10) << dec << bigcounter << hex << " Thread 0x" << PIN_ThreadUid() << " finished. Code: " << dec << code << endl;
@@ -834,7 +834,7 @@ void ThreadFinish_cb(THREADID threadIndex, const CONTEXT *ctxt, INT32 code, VOID
                 printf("THREAD error: %s\n", sqlite3_errmsg(db));
             break;
     }
-    PIN_ReleaseLock(&lock);
+    PIN_ReleaseLock(&_lock);
 }
 
 /* ===================================================================== */
@@ -956,7 +956,7 @@ int  main(int argc, char *argv[])
     switch (LogType) {
         case HUMAN:
             TraceFile.open(TraceName.c_str());
-            if(TraceFile == NULL)
+            if(TraceFile.fail())
             {
                 cerr << "[!] Something went wrong opening the log file..." << endl;
                 return -1;
