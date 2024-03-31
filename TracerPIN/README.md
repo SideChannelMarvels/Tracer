@@ -8,7 +8,7 @@ X86 and X86_64.
 Installation
 ------------
 
-TracerPIN requires the Intel PIN framework to compile and run as well as a few packages.
+TracerPIN requires the [Intel PIN framework](https://www.intel.com/content/www/us/en/developer/articles/tool/pin-a-binary-instrumentation-tool-downloads.html) to compile and run as well as a few packages.
 
 For example on a Debian Jessie one would do:
 
@@ -24,11 +24,11 @@ sudo apt-get install --no-install-recommends libstdc++-4.9-dev:i386 libssl-dev:i
 Then for Intel PIN, make sure the user has r/w access to the PIN installation and to ease the next steps define PIN_ROOT:
 
 ```bash
-wget http://software.intel.com/sites/landingpage/pintool/downloads/pin-3.15-98253-gb56e429b1-gcc-linux.tar.gz
-tar xzf pin-3.15-98253-gb56e429b1-gcc-linux.tar.gz
-mv pin-3.15-98253-gb56e429b1-gcc-linux /opt
-export PIN_ROOT=/opt/pin-3.15-98253-gb56e429b1-gcc-linux
-echo -e "\nexport PIN_ROOT=/opt/pin-3.15-98253-gb56e429b1-gcc-linux" >> ~/.bashrc
+wget https://software.intel.com/sites/landingpage/pintool/downloads/pin-3.30-98830-g1d7b601b3-gcc-linux.tar.gz
+tar xzf pin-3.30-98830-g1d7b601b3-gcc-linux.tar.gz
+mv pin-3.30-98830-g1d7b601b3-gcc-linux /opt
+export PIN_ROOT=/opt/pin-3.30-98830-g1d7b601b3-gcc-linux
+echo -e "\nexport PIN_ROOT=/opt/pin-3.30-98830-g1d7b601b3-gcc-linux" >> ~/.bashrc
 ```
 
 Now you're ready to compile TracerPIN and install it.
