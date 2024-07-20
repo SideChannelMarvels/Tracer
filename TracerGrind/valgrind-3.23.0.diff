@@ -1,0 +1,35 @@
+diff -Naur valgrind-3.23.0/Makefile.am valgrind-3.23.0/Makefile.am
+--- valgrind-3.23.0/Makefile.am	2024-04-26 18:47:41.000000000 +0200
++++ valgrind-3.23.0/Makefile.am	2024-07-20 09:15:14.938126298 +0200
+@@ -8,6 +8,7 @@
+ 		cachegrind \
+ 		callgrind \
+ 		helgrind \
++		tracergrind \
+ 		drd \
+ 		massif \
+ 		dhat \
+diff -Naur valgrind-3.23.0/auxprogs/gen-mdg valgrind-3.23.0/auxprogs/gen-mdg
+--- valgrind-3.23.0/auxprogs/gen-mdg	2024-04-26 18:47:41.000000000 +0200
++++ valgrind-3.23.0/auxprogs/gen-mdg	2024-07-20 09:15:14.938126298 +0200
+@@ -55,7 +55,7 @@
+ 
+ # List of all tools.
+ my @tools = ( "cachegrind", "helgrind",
+-              "lackey", "massif", "memcheck", "none" );
++              "lackey", "massif", "memcheck", "tracergrind", "none" );
+ 
+ my $usage = <<END
+ usage: gen-mdg [options]
+diff -Naur valgrind-3.23.0/configure.ac valgrind-3.23.0/configure.ac
+--- valgrind-3.23.0/configure.ac	2024-04-26 18:47:41.000000000 +0200
++++ valgrind-3.23.0/configure.ac	2024-07-20 09:15:14.938126298 +0200
+@@ -5709,6 +5709,8 @@
+    exp-bbv/tests/arm-linux/Makefile
+    shared/Makefile
+    solaris/Makefile
++   tracergrind/Makefile
++   tracergrind/tests/Makefile
+ ])
+ AC_CONFIG_FILES([coregrind/link_tool_exe_linux],
+                 [chmod +x coregrind/link_tool_exe_linux])
