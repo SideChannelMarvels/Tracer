@@ -32,6 +32,7 @@
 #include "pub_tool_machine.h"
 #include "pub_tool_xarray.h"
 #include "pub_tool_clientstate.h"
+#include "pub_tool_mallocfree.h"
 
 #include "trace_protocol.h"
 #include "version.h"
@@ -52,12 +53,12 @@ static uint64_t exec_id = 0;
 #define MAX_THREAD 2048
 #define MAX_FILTER 64
 
-static HChar* trace_output_filename;
-static HChar *filter_str;
+static const HChar* trace_output_filename;
+static const HChar *filter_str;
 static HChar *filters_instr[MAX_FILTER];
-static HChar *filter_mem_str;
+static const HChar *filter_mem_str;
 static HChar *filters_mem[MAX_FILTER];
-static HChar *filter_bblock_str;
+static const HChar *filter_bblock_str;
 static HChar *filters_bblock[MAX_FILTER];
 static Int trace_output_fd = 0;
 static Addr filter_instr_start[MAX_FILTER], filter_instr_end[MAX_FILTER];
@@ -66,9 +67,9 @@ static Int filter_bblock_start[MAX_FILTER], filter_bblock_end[MAX_FILTER];
 static int filter_instr_number = 0;
 static int filter_mem_number = 0;
 static int filter_bblock_number = 0;
-static int trace_instr = 1;
-static int trace_mem_read = 1;
-static int trace_mem_write = 1;
+static Bool trace_instr = 1;
+static Bool trace_mem_read = 1;
+static Bool trace_mem_write = 1;
 
 static int memory_events_idx = 0;
 static int memory_buffer_idx = 0;
@@ -80,11 +81,11 @@ static int code_event_idx = 0;
 static uint64_t address_buffer[MAX_CODE_EVENT];
 static uint8_t length_buffer[MAX_CODE_EVENT];
 static uint8_t code_buffer[CODE_BUFFER_SIZE];
-static uint32_t thread_counter = 0;
+static uint64_t thread_counter = 0;
 static uint64_t thread_ids[MAX_THREAD];
 
 // ---- Trace file format helper functions ----
-Bool traceBblock(Int i)
+static Bool traceBblock(Int i)
 {
     Int        j;
     Bool trace_bblock = False;
@@ -107,7 +108,7 @@ Bool traceBblock(Int i)
     return trace_bblock;
 }
 
-void sendInfoMsg(UInt fd, InfoMsg *info_msg)
+static void sendInfoMsg(UInt fd, InfoMsg *info_msg)
 {
     uint8_t type = MSG_INFO;
     uint64_t length = 9; // msg header
@@ -120,7 +121,7 @@ void sendInfoMsg(UInt fd, InfoMsg *info_msg)
     VG_(write)(fd, (void*)msg_buffer, length);
 }
 
-void sendLibMsg(UInt fd, LibMsg *lib_msg)
+static void sendLibMsg(UInt fd, LibMsg *lib_msg)
 {
     uint8_t type = MSG_LIB;
     uint64_t length = 25; // msg header
@@ -133,7 +134,7 @@ void sendLibMsg(UInt fd, LibMsg *lib_msg)
     VG_(write)(fd, msg_buffer, length);
 }
 
-void sendExecMsg(UInt fd, ExecMsg *exec_msg)
+static void sendExecMsg(UInt fd, ExecMsg *exec_msg)
 {
     if (traceBblock(exec_msg->exec_id) && trace_instr)
     {
@@ -153,7 +154,7 @@ void sendExecMsg(UInt fd, ExecMsg *exec_msg)
     }
 }
 
-void sendMemoryMsg(UInt fd, MemoryMsg *memory_msg)
+static void sendMemoryMsg(UInt fd, MemoryMsg *memory_msg)
 {
     if ((trace_mem_read && (memory_msg->mode == MODE_READ)) || (trace_mem_write && (memory_msg->mode == MODE_WRITE)))
     {
@@ -175,7 +176,7 @@ void sendMemoryMsg(UInt fd, MemoryMsg *memory_msg)
     }
 }
 
-void sendThreadMsg(UInt fd, ThreadMsg *thread_msg)
+static void sendThreadMsg(UInt fd, ThreadMsg *thread_msg)
 {
     uint8_t type = MSG_THREAD;
     uint64_t length = 26; // msg header
@@ -190,7 +191,7 @@ void sendThreadMsg(UInt fd, ThreadMsg *thread_msg)
 
 // ---- Instrumentation callbacks ----
 
-static void flushMemoryEvents()
+static void flushMemoryEvents(void)
 {
     int i;
     for(i = 0; i < memory_events_idx; i++)
@@ -199,7 +200,7 @@ static void flushMemoryEvents()
     memory_buffer_idx = 0;
 }
 
-static void flushCodeEvents()
+static void flushCodeEvents(void)
 {
     flushMemoryEvents();
     ExecMsg msg;
@@ -267,7 +268,7 @@ static void threadStartedCallback(ThreadId tid, ULong block_dispatched)
         thread_id = tid;
 }
 
-Bool traceMem(Addr a)
+static Bool traceMem(Addr a)
 {
     Int        j;
     Bool trace_mem = False;
@@ -330,14 +331,14 @@ static VG_REGPARM(3) void writeCallback(Addr ins_addr, Addr start_addr, SizeT le
     }
 }
 
-void trackMemCallback(Addr a, SizeT len, Bool rr, Bool ww, Bool xx, ULong di_handle)
+static void trackMemCallback(Addr a, SizeT len, Bool rr, Bool ww, Bool xx, ULong di_handle)
 {
-    DebugInfo *di = NULL;
+    const DebugInfo *di = NULL;
     int i;
     while((di = VG_(next_DebugInfo)(di)) != NULL)
     {
-        char *filename = VG_(DebugInfo_get_filename)(di);
-        char *soname = VG_(DebugInfo_get_soname)(di);
+        const char *filename = VG_(DebugInfo_get_filename)(di);
+        const char *soname = VG_(DebugInfo_get_soname)(di);
         for(i = 0; i < filter_instr_number; i++)
         {
             if(filters_instr[i] != NULL &&
@@ -377,7 +378,8 @@ static Bool tg_process_cmd_line_option(const HChar* arg)
     else if VG_STR_CLO(arg, "--filter", filter_str)
     {
         int i;
-        filters_instr[0] = VG_(strtok)(filter_str, ",");
+        HChar* my_filter_str = VG_(strdup)("tg.filter", filter_str);
+        filters_instr[0] = VG_(strtok)(my_filter_str, ",");
         for(i = 1; i<MAX_FILTER; i++)
         {
             filters_instr[i] = VG_(strtok)(NULL, ",");
@@ -389,7 +391,8 @@ static Bool tg_process_cmd_line_option(const HChar* arg)
     else if VG_STR_CLO(arg, "--filter-mem", filter_mem_str)
     {
         int i;
-        filters_mem[0] = VG_(strtok)(filter_mem_str, ",");
+        HChar* my_filter_mem_str = VG_(strdup)("tg.filter_mem", filter_mem_str);
+        filters_mem[0] = VG_(strtok)(my_filter_mem_str, ",");
         for(i = 1; i<MAX_FILTER; i++)
         {
             filters_mem[i] = VG_(strtok)(NULL, ",");
@@ -401,7 +404,8 @@ static Bool tg_process_cmd_line_option(const HChar* arg)
     else if VG_STR_CLO(arg, "--filter-bblock", filter_bblock_str)
     {
         int i;
-        filters_bblock[0] = VG_(strtok)(filter_bblock_str, ",");
+        HChar* my_filter_bblock_str = VG_(strdup)("tg.filter_bblock", filter_bblock_str);
+        filters_bblock[0] = VG_(strtok)(my_filter_bblock_str, ",");
         for(i = 1; i<MAX_FILTER; i++)
         {
             filters_bblock[i] = VG_(strtok)(NULL, ",");
@@ -431,7 +435,7 @@ static void tg_post_clo_init(void)
     VexArch vex_arch;
     VexArchInfo vex_arch_info;
     InfoMsg msg;
-    char* buffer[INFO_BUFFER_SIZE];
+    HChar buffer[INFO_BUFFER_SIZE];
     char *start, *end;
     int i;
 
@@ -519,17 +523,17 @@ static void tg_post_clo_init(void)
 
 static IRSB* tg_instrument(VgCallbackClosure* closure,
                             IRSB* sbIn, 
-                            VexGuestLayout* layout, 
-                            VexGuestExtents* vge,
-                            VexArchInfo* archinfo_host,
+                            const VexGuestLayout* layout, 
+                            const VexGuestExtents* vge,
+                            const VexArchInfo* archinfo_host,
                             IRType gWordTy, IRType hWordTy)
 {
     IRDirty*   di;
     Int        i, j;
     IRSB*      sbOut;
     IRExpr **argv, *arg1, *arg2, *arg3;
-    Addr64 last_addr;
-    Bool trace_instr = False;
+    Addr64 last_addr = 0;
+    Bool l_trace_instr = False;
     if (gWordTy != hWordTy)
     {
         VG_(tool_panic)("host/guest word size mismatch");
@@ -546,16 +550,16 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
         i++;
     }
     if(filter_instr_number == 0)
-        trace_instr = True;
+        l_trace_instr = True;
     else
         for(j = 0; j < filter_instr_number; j++)
             if(filter_instr_start[j] <= sbIn->stmts[i]->Ist.IMark.addr &&
                filter_instr_end[j] >= sbIn->stmts[i]->Ist.IMark.addr)
-                trace_instr = True;
+                l_trace_instr = True;
     for(; i < sbIn->stmts_used; i++)
     {
         IRStmt* st = sbIn->stmts[i];
-        if(trace_instr == True)
+        if(l_trace_instr == True)
         {
             if(st->tag == Ist_IMark)
             {
@@ -633,7 +637,7 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
         }
         // First executing the instruction then checking what was written
         addStmtToIRSB(sbOut, st);
-        if(trace_instr == True)
+        if(l_trace_instr == True)
         {
             if(st->tag == Ist_StoreG)
             {
@@ -688,7 +692,7 @@ static IRSB* tg_instrument(VgCallbackClosure* closure,
 
 static void tg_fini(Int exitcode)
 {
-    DebugInfo *di = NULL;
+    const DebugInfo *di = NULL;
     LibMsg lib_msg;
     flushCodeEvents();
     while((di = VG_(next_DebugInfo)(di)) != NULL)

@@ -39,7 +39,7 @@ than /usr (which would overwrite a distribution installation of Valgrind), the d
 ```bash
 wget 'https://sourceware.org/pub/valgrind/valgrind-3.23.0.tar.bz2'
 tar xf valgrind-3.23.0.tar.bz2
-cp -r tracergrind-3.23.0 valgrind-3.23.0/
+cp -r tracergrind valgrind-3.23.0/
 patch -p0 < valgrind-3.23.0.diff
 cd valgrind-3.23.0/
 ./autogen.sh
